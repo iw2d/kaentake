@@ -1,6 +1,8 @@
 #include "hook.h"
 #include <windows.h>
 
+extern "C" __declspec(dllexport) VOID DummyExport() {}
+
 
 BOOL WINAPI DllMain(HINSTANCE hModule, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {

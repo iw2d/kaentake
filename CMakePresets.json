@@ -11,20 +11,14 @@
             "displayName": "Debug x86 (Visual Studio 17 2022)",
             "generator": "Visual Studio 17 2022",
             "architecture": "Win32",
-            "binaryDir": "${sourceDir}/build",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
+            "binaryDir": "${sourceDir}/build"
         },
         {
             "name": "release-win32",
             "displayName": "Release x86 (Visual Studio 17 2022)",
             "generator": "Visual Studio 17 2022",
             "architecture": "Win32",
-            "binaryDir": "${sourceDir}/build",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
+            "binaryDir": "${sourceDir}/build"
         }
     ],
     "buildPresets": [

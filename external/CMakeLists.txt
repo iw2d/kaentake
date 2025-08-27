@@ -9,9 +9,6 @@ add_library(Detours STATIC
 )
 target_include_directories(Detours PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Detours/src)
 
-# Build Gr2D_DX8to9
-add_subdirectory(Gr2D_DX8to9)
 
 # Build WzLib
-set(WZLIB_NAME "WzLib" CACHE STRING "" FORCE)
 add_subdirectory(WzLib)

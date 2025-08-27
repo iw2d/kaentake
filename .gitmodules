@@ -4,7 +4,4 @@
 [submodule "external/WzLib"]
 	path = external/WzLib
 	url = https://github.com/iw2d/WzLib.git
-	branch = v83
-[submodule "external/Gr2D_DX8to9"]
-	path = external/Gr2D_DX8to9
-	url = https://github.com/iw2d/Gr2D_DX8to9.git
+	branch = v83_DX8to9
