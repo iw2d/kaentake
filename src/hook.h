@@ -1,5 +1,6 @@
 #pragma once
 #include "debug.h"
+#include <type_traits>
 
 #ifdef _DEBUG
 #define ATTACH_HOOK(TARGET, DETOUR) \
@@ -12,23 +13,27 @@
 #define MEMBER_AT(T, OFFSET, NAME) \
     __declspec(property(get = get_##NAME, put = set_##NAME)) T NAME; \
     __forceinline const T& get_##NAME() const { \
-        return *reinterpret_cast<const T*>(reinterpret_cast<void*>(this) + OFFSET); \
+        return *reinterpret_cast<const T*>(reinterpret_cast<uintptr_t>(this) + OFFSET); \
     } \
     __forceinline T& get_##NAME() { \
-        return *reinterpret_cast<T*>(reinterpret_cast<void*>(this) + OFFSET); \
+        return *reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(this) + OFFSET); \
     } \
     __forceinline void set_##NAME(const T& value) { \
-        *reinterpret_cast<T*>(reinterpret_cast<void*>(this) + OFFSET) = const_cast<T&>(value); \
+        *reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(this) + OFFSET) = const_cast<T&>(value); \
     } \
     __forceinline void set_##NAME(T& value) { \
-        *reinterpret_cast<T*>(reinterpret_cast<void*>(this) + OFFSET) = value; \
+        *reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(this) + OFFSET) = value; \
     }
 
 #define MEMBER_ARRAY_AT(T, OFFSET, NAME, N) \
     __declspec(property(get = get_##NAME)) T(&NAME)[N]; \
     __forceinline T(&get_##NAME())[N] { \
-        return *reinterpret_cast<T(*)[N]>(reinterpret_cast<void*>(this) + OFFSET); \
+        return *reinterpret_cast<T(*)[N]>(reinterpret_cast<uintptr_t>(this) + OFFSET); \
     }
+
+#define TO_UINTPTR(VALUE) ((uintptr_t)(VALUE))
+
+#define TO_PVOID(VALUE) ((void*)(VALUE))
 
 
 // called in injector.cpp -> DllMain
@@ -43,7 +48,7 @@ inline void AttachClientHooks() {
 
 
 template <typename T>
-__forceinline auto CastHook(T fn) -> void* {
+constexpr auto CastHook(T fn) -> void* {
     union {
         T fn;
         void* p;
@@ -62,31 +67,41 @@ void* GetAddressByPattern(const char* sModuleName, const char* sPattern);
 
 void PatchMemory(void* pAddress, void* pValue, size_t uSize);
 
+
 template <typename T>
 void Patch1(T pAddress, unsigned char uValue) {
-    PatchMemory(reinterpret_cast<void*>(pAddress), &uValue, sizeof(uValue));
+    PatchMemory(TO_PVOID(pAddress), &uValue, sizeof(uValue));
 }
 
 template <typename T>
 void Patch4(T pAddress, unsigned int uValue) {
-    PatchMemory(reinterpret_cast<void*>(pAddress), &uValue, sizeof(uValue));
+    PatchMemory(TO_PVOID(pAddress), &uValue, sizeof(uValue));
 }
 
 template <typename T>
-void PatchStr(T uAddress, const char* sValue) {
-    PatchMemory(reinterpret_cast<void*>(pAddress), &uValue, strlen(sValue));
+void PatchStr(T pAddress, const char* sValue) {
+    PatchMemory(TO_PVOID(pAddress), &uValue, strlen(sValue));
 }
 
-template <typename T>
-void PatchJmp(T pAddress, void* pDestination) {
+template <typename T, typename U>
+void PatchNop(T pAddress, U pDestination) {
+    size_t uSize = TO_UINTPTR(pDestination) - TO_UINTPTR(pAddress);
+    void* pValue = malloc(uSize);
+    memset(pValue, 0x90, uSize);
+    PatchMemory(TO_PVOID(pAddress), pValue, uSize);
+    free(pValue);
+}
+
+template <typename T, typename U>
+void PatchJmp(T pAddress, U pDestination) {
     Patch1(pAddress, 0xE9);
-    Patch4(pAddress + 1, reinterpret_cast<uintptr_t>(pDestination) - reinterpret_cast<uintptr_5>(pAddress) - 5);
+    Patch4(pAddress + 1, TO_UINTPTR(pDestination) - TO_UINTPTR(pAddress) - 5);
 }
 
-template <typename T>
-void PatchCall(T pAddress, void* pDestination) {
+template <typename T, typename U>
+void PatchCall(T pAddress, U pDestination) {
     Patch1(pAddress, 0xE8);
-    Patch4(pAddress + 1, reinterpret_cast<uintptr_t>(pDestination) - reinterpret_cast<uintptr_5>(pAddress) - 5);
+    Patch4(pAddress + 1, TO_UINTPTR(pDestination) - TO_UINTPTR(pAddress) - 5);
 }
 
 template <typename T>
