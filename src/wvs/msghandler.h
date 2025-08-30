@@ -32,3 +32,11 @@ public:
         return ms_RTTI_IUIMsgHandler.IsKindOf(pRTTI);
     }
 };
+
+
+class CInPacket;
+
+class INetMsgHandler {
+public:
+    virtual void OnPacket(int32_t nType, CInPacket& iPacket) {}
+};

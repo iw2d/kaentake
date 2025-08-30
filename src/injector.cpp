@@ -1,5 +1,9 @@
 #include "hook.h"
+#include "ztl/zalloc.h"
 #include <windows.h>
+
+ZALLOC_GLOBAL
+ZALLOCEX(ZAllocAnonSelector, 0x00BF0B00)
 
 extern "C" __declspec(dllexport) VOID DummyExport() {}
 
