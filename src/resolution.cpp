@@ -1,11 +1,14 @@
 #include "hook.h"
 #include "wvs/config.h"
 #include "wvs/ctrlwnd.h"
+#include "wvs/wndman.h"
 #include "wvs/stage.h"
 #include "wvs/rtti.h"
 #include "wvs/util.h"
 #include "ztl/zalloc.h"
 #include "ztl/zcom.h"
+#include "ztl/ztl.h"
+#include <windows.h>
 
 
 static ZRef<CCtrlComboBox> g_cbResolution;
@@ -54,6 +57,8 @@ void set_screen_resolution(int nResolution, bool bSave) {
             g_nScreenHeight = nScreenHeight;
             g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
             gr->AdjustCenter(0, -g_nAdjustCenterY);
+            // CWndMan::ResetOrgWindow
+            CWndMan::GetInstance()->m_pOrgWindow->RelMove(get_screen_width() / -2, get_screen_height() / -2 - get_adjust_cy());
         }
     }
     if (bSave) {
@@ -131,6 +136,27 @@ void __fastcall CUISysOpt__dtor_hook(CUISysOpt* pThis) {
 }
 
 
+class CInputSystem {
+public:
+    MEMBER_AT(HWND, 0x0, m_hWnd)
+    MEMBER_AT(IWzVector2DPtr, 0x9B0, m_pVectorCursor)
+};
+
+static auto CInputSystem__SetCursorVectorPos = reinterpret_cast<void(__thiscall*)(CInputSystem*, int, int)>(0x0059A0CB);
+void __fastcall CInputSystem__SetCursorVectorPos_hook(CInputSystem* pThis, void* _EDX, int x, int y) {
+    pThis->m_pVectorCursor->RelMove(x - get_screen_width() / 2, y - get_screen_height() / 2 - get_adjust_cy());
+}
+
+static auto CInputSystem__SetCursorPos = reinterpret_cast<int(__thiscall*)(CInputSystem*, int, int)>(0x0059A887);
+int __fastcall CInputSystem__SetCursorPos_hook(CInputSystem* pThis, void* _EDX, int x, int y) {
+    POINT pt;
+    pt.x = zclamp(x, 0, get_screen_width());
+    pt.y = zclamp(y, 0, get_screen_height());
+    CInputSystem__SetCursorVectorPos_hook(pThis, _EDX, pt.x, pt.y);
+    return ClientToScreen(pThis->m_hWnd, &pt) && SetCursorPos(pt.x, pt.y);
+}
+
+
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
     ATTACH_HOOK(CConfig__LoadGlobal, CConfig__LoadGlobal_hook);
@@ -138,5 +164,12 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CConfig__ApplySysOpt, CConfig__ApplySysOpt_hook);
     ATTACH_HOOK(CUISysOpt__OnCreate, CUISysOpt__OnCreate_hook);
     ATTACH_HOOK(CUISysOpt__dtor, CUISysOpt__dtor_hook);
-    Patch4(0x00994525 + 1, 0); // Hide Monster Info in CUISysOpt
+    // CUISysOpt::OnCreate - hide monster info combo box
+    Patch4(0x00994525 + 1, 0);
+
+    ATTACH_HOOK(CInputSystem__SetCursorVectorPos, CInputSystem__SetCursorVectorPos_hook);
+    ATTACH_HOOK(CInputSystem__SetCursorPos, CInputSystem__SetCursorPos_hook);
+    // CWvsApp::CreateWndManager - maximum bounds for CWndMan
+    Patch4(0x009F707D + 1, 1920);
+    Patch4(0x009F7078 + 1, 1080);
 }
