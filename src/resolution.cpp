@@ -1,4 +1,5 @@
 #include "hook.h"
+#include "wvs/wnd.h"
 #include "wvs/ctrlwnd.h"
 #include "wvs/stage.h"
 #include "wvs/rtti.h"
@@ -187,7 +188,7 @@ void __declspec(naked) CMapLoadable__MakeGrid_hook() {
 }
 
 
-class CWndMan : public TSingleton<CWndMan, 0x00BEC20C> {
+class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
 public:
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
 };
@@ -238,6 +239,27 @@ void set_screen_resolution(int nResolution, bool bSave) {
 }
 
 
+static auto CUIToolTip__MakeLayer_jmp1 = 0x008F32CC;
+static auto CUIToolTip__MakeLayer_ret1 = 0x008F32D1;
+void __declspec(naked) CUIToolTip__MakeLayer_hook1() {
+    __asm {
+        mov     eax, g_nScreenWidth
+        sub     eax, 1
+        jmp     [ CUIToolTip__MakeLayer_ret1 ]
+    };
+}
+
+static auto CUIToolTip__MakeLayer_jmp2 = 0x008F32DF;
+static auto CUIToolTip__MakeLayer_ret2 = 0x008F32E4;
+void __declspec(naked) CUIToolTip__MakeLayer_hook2() {
+    __asm {
+        mov     eax, g_nScreenHeight
+        sub     eax, 1
+        jmp     [ CUIToolTip__MakeLayer_ret2 ]
+    };
+}
+
+
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
     ATTACH_HOOK(CConfig::LoadGlobal_orig, CConfig::LoadGlobal_hook);
@@ -255,4 +277,13 @@ void AttachResolutionMod() {
     // CWvsApp::CreateWndManager - maximum bounds for CWndMan
     Patch4(0x009F707D + 1, 1920);
     Patch4(0x009F7078 + 1, 1080);
+
+    // CUIToolTip::MakeLayer - maximum bounds for CUIToolTip
+    PatchJmp(CUIToolTip__MakeLayer_jmp1, &CUIToolTip__MakeLayer_hook1);
+    PatchJmp(CUIToolTip__MakeLayer_jmp2, &CUIToolTip__MakeLayer_hook2);
+
+    // CSlideNotice - sliding notice width
+    Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
+    Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
+    Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
 }

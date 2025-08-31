@@ -2,12 +2,10 @@
 #include "hook.h"
 #include "wvs/gobj.h"
 #include "wvs/msghandler.h"
+#include "wvs/wnd.h"
 #include "ztl/zalloc.h"
 #include <windows.h>
 
-
-class CWnd;
-struct DRAGCTX;
 
 class CCtrlWnd : public IGObj, public IUIMsgHandler, public ZRefCounted {
 public:
