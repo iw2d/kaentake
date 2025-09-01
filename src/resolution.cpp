@@ -5,6 +5,7 @@
 #include "wvs/rtti.h"
 #include "wvs/util.h"
 #include "ztl/zalloc.h"
+#include "ztl/zcoll.h"
 #include "ztl/zcom.h"
 #include "ztl/ztl.h"
 #include "ztl/tsingleton.h"
@@ -271,7 +272,8 @@ void __declspec(naked) CMapLoadable__MakeGrid_hook() {
 class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
 public:
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
-    MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField);
+    MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField)
+    MEMBER_HOOK(IUIMsgHandler*, 0x009E42B2, GetHandlerFromPoint, int x, int y)
 };
 
 void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
@@ -284,6 +286,14 @@ void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
             lpPoint->y += m_pOrgWindow->y;
         }
     }
+}
+
+IUIMsgHandler* CWndMan::GetHandlerFromPoint_hook(int x, int y) {
+    IUIMsgHandler* pHandler = CWndMan::GetHandlerFromPoint(this, x, y);
+    if (!pHandler && x >= get_adjust_dx() && x < get_screen_width() + get_adjust_dx() && y >= get_adjust_dy() && y < get_screen_height() + get_adjust_dy()) {
+        return CWndMan::GetInstance();
+    }
+    return pHandler;
 }
 
 
@@ -342,6 +352,52 @@ IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nT
 }
 
 
+class CTemporaryStatView {
+public:
+    enum {
+        TSV_NONE = 0x0,
+        TSV_ITEM = 0x1,
+        TSV_SKILL = 0x2,
+        TSV_ETC = 0x3,
+        TSV_PRIVILEGE = 0x4,
+    };
+    struct TEMPORARY_STAT : public ZRefCounted {
+        unsigned char pad0[0x40 - sizeof(ZRefCounted)];
+        MEMBER_AT(int, 0x1C, nType)
+        MEMBER_AT(IWzGr2DLayerPtr, 0x28, pLayer)
+        MEMBER_AT(IWzGr2DLayerPtr, 0x2C, pLayerShadow)
+    };
+    MEMBER_AT(ZList<ZRef<TEMPORARY_STAT>>, 0x4, m_lTemporaryStat)
+    MEMBER_HOOK(void, 0x007B2BB0, AdjustPosition)
+    MEMBER_HOOK(int, 0x007B2E58, ShowToolTip, CUIToolTip& uiToolTip, POINT* ptCursor, int rx, int ry)
+    MEMBER_HOOK(void, 0x007B3055, FindIcon, POINT* ptCursor, int& nType, int& nID)
+};
+
+void CTemporaryStatView::AdjustPosition_hook() {
+    int nOffsetX = (get_screen_width() / 2) - 3 + (-32 * m_lTemporaryStat.GetCount());
+    int nOffsetY = (get_screen_height() / 2) + get_adjust_cy() - 23;
+    auto pos = m_lTemporaryStat.GetHeadPosition();
+    while (pos) {
+        auto pNext = m_lTemporaryStat.GetNext(pos);
+        pNext->pLayer->RelMove((32 - pNext->pLayer->width) / 2 + nOffsetX, (32 - pNext->pLayer->height) / 2 - nOffsetY);
+        pNext->pLayerShadow->RelMove((32 - pNext->pLayerShadow->width) / 2 + nOffsetX, (32 - pNext->pLayerShadow->height) / 2 - nOffsetY);
+        nOffsetX += 32;
+    }
+}
+
+int CTemporaryStatView::ShowToolTip_hook(CUIToolTip& uiToolTip, POINT* ptCursor, int rx, int ry) {
+    ptCursor->x += get_adjust_dx();
+    ptCursor->y -= get_adjust_dy();
+    return CTemporaryStatView::ShowToolTip(this, uiToolTip, ptCursor, rx, ry);
+}
+
+void CTemporaryStatView::FindIcon_hook(POINT* ptCursor, int& nType, int& nID) {
+    ptCursor->x += get_adjust_dx();
+    ptCursor->y -= get_adjust_dy();
+    CTemporaryStatView::FindIcon(this, ptCursor, nType, nID);
+}
+
+
 class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
 };
 
@@ -377,7 +433,7 @@ void set_screen_resolution(int nResolution, bool bSave) {
                 CSlideNotice::GetInstance()->MoveWnd(get_adjust_dx(), get_adjust_dy());
             }
             // CMapLoadable::OnEventChangeScreenResolution
-            CMapLoadable* field = reinterpret_cast<CMapLoadable*(__cdecl*)()>(0x00437A0C)();
+            CMapLoadable* field = reinterpret_cast<CMapLoadable*(__cdecl*)()>(0x00437A0C)(); // get_field();
             if (field) {
                 // CMapLoadable::RestoreViewRange
                 field->RestoreViewRange_hook();
@@ -408,6 +464,7 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
     ATTACH_HOOK(CWndMan::GetCursorPos, CWndMan::GetCursorPos_hook);
+    ATTACH_HOOK(CWndMan::GetHandlerFromPoint, CWndMan::GetHandlerFromPoint_hook);
 
     // CWnd::OnMoveWnd - handle snapping to screen bounds
     ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
@@ -418,6 +475,11 @@ void AttachResolutionMod() {
 
     // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
     ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
+
+    // CTemporaryStatView - reposition buff display
+    ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
+    ATTACH_HOOK(CTemporaryStatView::ShowToolTip, CTemporaryStatView::ShowToolTip_hook);
+    ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
 
     // CSlideNotice - sliding notice width
     Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice

@@ -238,14 +238,10 @@ public:
 
 template <typename T>
 class ZRefCountedDummy : public ZRefCounted, public ZRecyclable<ZRefCountedDummy<T>, 0x10, T> {
-private:
+public:
     T t;
 
-public:
     virtual ~ZRefCountedDummy() override = default;
-    operator T*() const {
-        return zaddressof(t);
-    }
     static ZRefCountedDummy<T>* From(const T* pT) {
         return reinterpret_cast<ZRefCountedDummy<T>*>(reinterpret_cast<uintptr_t>(pT) - offsetof(ZRefCountedDummy<T>, t));
     }
@@ -361,7 +357,7 @@ private:
     static T* _AllocRaw(void* __formal) {
         auto pDummy = new ZRefCountedDummy<T>();
         ZRefCountedAccessorBase::_Set1(pDummy);
-        return static_cast<T*>(pDummy);
+        return zaddressof(pDummy->t);
     }
     static T* _AllocRaw(ZRefCounted* __formal) {
         auto p = new T();
