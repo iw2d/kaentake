@@ -9,6 +9,7 @@
 #include "ztl/ztl.h"
 #include "ztl/tsingleton.h"
 #include <windows.h>
+#include <strsafe.h>
 
 
 static ZRef<CCtrlComboBox> g_cbResolution;
@@ -41,18 +42,15 @@ void set_screen_resolution(int nResolution, bool bSave);
 
 static auto set_stage = reinterpret_cast<void(__cdecl*)(CStage*, void*)>(0x00777347);
 void __cdecl set_stage_hook(CStage* pStage, void* pParam) {
-    set_stage(pStage, pParam);
-    if (!pStage) {
-        return;
-    }
-    // CInterStage::ms_RTTI_CInterStage
-    if (pStage->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BED874))) {
-        return;
-    }
-    // CField::ms_RTTI_CField
-    if (pStage->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BED758))) {
+    // CField::ms_RTTI_CField - change resolution before set_stage
+    if (pStage && pStage->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BED758))) {
         set_screen_resolution(g_nResolution, 0);
-    } else {
+        set_stage(pStage, pParam);
+        return;
+    }
+    set_stage(pStage, pParam);
+    // !CInterStage::ms_RTTI_CInterStage - change resolution after set_stage
+    if (pStage && !pStage->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BED874))) {
         set_screen_resolution(0, 0);
     }
 }
@@ -65,26 +63,97 @@ public:
         LAST_CONNECT_INFO = 0x1,
         CHARACTER_OPT = 0x2,
     };
+    MEMBER_ARRAY_AT(int, 0xCC, m_nUIWnd_X, 34)
+    MEMBER_ARRAY_AT(int, 0x154, m_nUIWnd_Y, 34)
+
+    MEMBER_HOOK(void, 0x0049D0B6, LoadCharacter, int nWorldID, unsigned int dwCharacterId)
     MEMBER_HOOK(void, 0x0049C441, LoadGlobal)
     MEMBER_HOOK(void, 0x0049C8E7, SaveGlobal)
     MEMBER_HOOK(void, 0x0049EA33, ApplySysOpt, void* pSysOpt, int bApplyVideo)
 
-    int GetOpt_Int(int nType, const char* sKey, int nDefaultValue, int nLowBound, int nHighBound) {
-        return reinterpret_cast<int(__thiscall*)(CConfig*, int, const char*, int, int, int)>(0x0049EF65)(this, nType, sKey, nDefaultValue, nLowBound, nHighBound);
+    int GetOpt_Int(int nType, const char* sKey, int nDefaultX, int nLowBound, int nHighBound) {
+        return reinterpret_cast<int(__thiscall*)(CConfig*, int, const char*, int, int, int)>(0x0049EF65)(this, nType, sKey, nDefaultX, nLowBound, nHighBound);
     }
     void SetOpt_Int(int nType, const char* sKey, int nValue) {
         reinterpret_cast<void(__thiscall*)(CConfig*, int, const char*, int)>(0x0049EFB5)(this, nType, sKey, nValue);
     }
 };
 
+void CConfig::LoadCharacter_hook(int nWorldID, unsigned int dwCharacterId) {
+    CConfig::LoadCharacter(this, nWorldID, dwCharacterId);
+    for (size_t i = 0; i < 34; ++i) {
+        char sBuffer[1024];
+        int nDefaultX;
+        int nDefaultY;
+        switch (i) {
+        case 4:
+            nDefaultX = 8;
+            nDefaultY = 8;
+            break;
+        case 8:
+            nDefaultX = 500;
+            nDefaultY = 50;
+            break;
+        case 9:
+        case 22:
+            nDefaultX = (i == 9) ? 250 : 500;
+            nDefaultY = 100;
+            break;
+        case 14:
+            nDefaultX = 600;
+            nDefaultY = 35;
+            break;
+        case 15:
+            nDefaultX = 730;
+            nDefaultY = 400;
+            break;
+        case 18:
+            nDefaultX = 11;
+            nDefaultY = 24;
+            break;
+        case 20:
+            nDefaultX = 720;
+            nDefaultY = 80;
+            break;
+        case 23:
+        case 31:
+        case 33:
+            nDefaultX = 100;
+            nDefaultY = 100;
+            break;
+        case 24:
+        case 25:
+        case 26:
+        case 27:
+        case 29:
+        case 32:
+            nDefaultX = 244;
+            nDefaultY = 105;
+            break;
+        case 30:
+            nDefaultX = 769;
+            nDefaultY = 343;
+            break;
+        default:
+            nDefaultX = 8 * (3 * i + 3);
+            nDefaultY = nDefaultX;
+            break;
+        }
+        sprintf_s(sBuffer, 1024, "uiWndX%d", i);
+        m_nUIWnd_X[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultX - get_adjust_dx(), get_adjust_dx() - 5, get_screen_width() + get_adjust_dx() - 6);
+        sprintf_s(sBuffer, 1024, "uiWndY%d", i);
+        m_nUIWnd_Y[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultY - get_adjust_dy(), get_adjust_dy() - 5, get_screen_height() + get_adjust_dy() - 6);
+    }
+}
+
 void CConfig::LoadGlobal_hook() {
     CConfig::LoadGlobal(this);
-    g_nResolution = GetOpt_Int(CConfig::GLOBAL_OPT, "soScreenResolution", 0, 0, 4);
+    g_nResolution = GetOpt_Int(GLOBAL_OPT, "soScreenResolution", 0, 0, 4);
 }
 
 void CConfig::SaveGlobal_hook() {
     CConfig::SaveGlobal(this);
-    SetOpt_Int(CConfig::GLOBAL_OPT, "soScreenResolution", g_nResolution);
+    SetOpt_Int(GLOBAL_OPT, "soScreenResolution", g_nResolution);
 }
 
 void CConfig::ApplySysOpt_hook(void* pSysOpt, int bApplyVideo) {
@@ -291,6 +360,7 @@ void __declspec(naked) CUIToolTip__MakeLayer_hook2() {
 
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
+    ATTACH_HOOK(CConfig::LoadCharacter, CConfig::LoadCharacter_hook);
     ATTACH_HOOK(CConfig::LoadGlobal, CConfig::LoadGlobal_hook);
     ATTACH_HOOK(CConfig::SaveGlobal, CConfig::SaveGlobal_hook);
     ATTACH_HOOK(CConfig::ApplySysOpt, CConfig::ApplySysOpt_hook);
