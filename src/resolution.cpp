@@ -286,9 +286,64 @@ void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
     }
 }
 
-class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
+
+static auto CWnd__OnMoveWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int)>(0x009DEB57);
+void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
+    CWnd__OnMoveWnd(pThis, l, t);
+    int nAbsLeft = pThis->GetAbsLeft();
+    int nAbsTop = pThis->GetAbsTop();
+    if (abs(nAbsLeft - get_adjust_dx()) <= 10) {
+        pThis->m_pLayer->lt->RelMove(get_adjust_dx(), nAbsTop);
+    }
+    if (abs(nAbsTop - get_adjust_dy()) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nAbsLeft, get_adjust_dy());
+    }
+    int nWidth = pThis->m_pLayer->width;
+    int nBoundX = get_screen_width() + get_adjust_dx();
+    if (abs(nAbsLeft + nWidth - nBoundX) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nBoundX - nWidth, nAbsTop);
+    }
+    int nHeight = pThis->m_pLayer->height;
+    int nBoundY = get_screen_height() + get_adjust_dy();
+    if (abs(nAbsTop + nHeight - nBoundY) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nAbsLeft, nBoundY - nHeight);
+    }
+}
+
+
+class CUIToolTip {
+public:
+    MEMBER_AT(int, 0x8, m_nHeight)
+    MEMBER_AT(int, 0xC, m_nWidth)
+    MEMBER_AT(IWzGr2DLayerPtr, 0x10, m_pLayer)
+    MEMBER_HOOK(IWzCanvasPtr*, 0x008F3141, MakeLayer, IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor)
 };
 
+IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor) {
+    CUIToolTip::MakeLayer(this, result, nLeft, nTop, bDoubleOutline, bLogin, bCharToolTip, uColor);
+    if (!bCharToolTip) {
+        if (nLeft < get_adjust_dx()) {
+            nLeft = get_adjust_dx();
+        }
+        if (nTop < get_adjust_dy()) {
+            nTop = get_adjust_dy();
+        }
+        int nBoundX = get_screen_width() + get_adjust_dx() - 1;
+        if (nLeft + m_nWidth > nBoundX) {
+            nLeft = nBoundX - m_nWidth;
+        }
+        int nBoundY = get_screen_height() + get_adjust_dy() - 1;
+        if (nTop + m_nHeight > nBoundY) {
+            nTop = nBoundY - m_nHeight;
+        }
+        m_pLayer->RelMove(nLeft, nTop);
+    }
+    return result;
+}
+
+
+class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
+};
 
 void set_screen_resolution(int nResolution, bool bSave) {
     int nScreenWidth = 800;
@@ -337,27 +392,6 @@ void set_screen_resolution(int nResolution, bool bSave) {
 }
 
 
-static auto CUIToolTip__MakeLayer_jmp1 = 0x008F32CC;
-static auto CUIToolTip__MakeLayer_ret1 = 0x008F32D1;
-void __declspec(naked) CUIToolTip__MakeLayer_hook1() {
-    __asm {
-        mov     eax, g_nScreenWidth
-        sub     eax, 1
-        jmp     [ CUIToolTip__MakeLayer_ret1 ]
-    }
-}
-
-static auto CUIToolTip__MakeLayer_jmp2 = 0x008F32DF;
-static auto CUIToolTip__MakeLayer_ret2 = 0x008F32E4;
-void __declspec(naked) CUIToolTip__MakeLayer_hook2() {
-    __asm {
-        mov     eax, g_nScreenHeight
-        sub     eax, 1
-        jmp     [ CUIToolTip__MakeLayer_ret2 ]
-    }
-}
-
-
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
     ATTACH_HOOK(CConfig::LoadCharacter, CConfig::LoadCharacter_hook);
@@ -375,18 +409,18 @@ void AttachResolutionMod() {
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
     ATTACH_HOOK(CWndMan::GetCursorPos, CWndMan::GetCursorPos_hook);
 
-    // CSlideNotice - sliding notice width
-    Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
-    Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
-    Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
-
-    // CWnd::OnMoveWnd - disable snapping to screen bounds (TODO: snap to screen bound)
+    // CWnd::OnMoveWnd - handle snapping to screen bounds
+    ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
     PatchJmp(0x009DFBFE, 0x009DFCC3);
     PatchJmp(0x009DFD01, 0x009DFDAA);
     PatchJmp(0x009DFDBB, 0x009DFE4D);
     PatchJmp(0x009DFE7E, 0x009DFF29);
 
-    // CUIToolTip::MakeLayer - maximum bounds for CUIToolTip - TODO: adjust dx/dy
-    PatchJmp(CUIToolTip__MakeLayer_jmp1, &CUIToolTip__MakeLayer_hook1);
-    PatchJmp(CUIToolTip__MakeLayer_jmp2, &CUIToolTip__MakeLayer_hook2);
+    // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
+    ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
+
+    // CSlideNotice - sliding notice width
+    Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
+    Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
+    Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
 }
