@@ -35,4 +35,16 @@ public:
             return m_pLayer->canvas[0];
         }
     }
+    void MoveWnd(int l, int t) {
+        m_pLayer->RelMove(l, t);
+    }
+    void CreateWnd(int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
+        reinterpret_cast<void(__thiscall*)(CWnd*, int, int, int, int, int, int, void*, int)>(0x009DE4D2)(this, l, t, w, h, z, bScreenCoord, pData, bSetFocus);
+    }
+    void Destroy() {
+        reinterpret_cast<void(__thiscall*)(CWnd*)>(0x009E00AF)(this);
+    }
+    void InvalidateRect(const RECT* pRect) {
+        reinterpret_cast<void(__thiscall*)(CWnd*, const RECT*)>(0x009E04C9)(this, pRect);
+    }
 };

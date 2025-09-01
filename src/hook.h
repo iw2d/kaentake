@@ -32,7 +32,7 @@
     }
 
 #define MEMBER_HOOK(T, ADDRESS, NAME, ...) \
-    inline static auto NAME##_orig = reinterpret_cast<T(__thiscall*)(void*, __VA_ARGS__)>(ADDRESS); \
+    inline static auto NAME = reinterpret_cast<T(__thiscall*)(void*, __VA_ARGS__)>(ADDRESS); \
     T NAME##_hook(__VA_ARGS__);
 
 #define TO_UINTPTR(VALUE) ((uintptr_t)(VALUE))

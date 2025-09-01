@@ -29,6 +29,13 @@ int get_adjust_cy() {
     return g_nAdjustCenterY;
 }
 
+int get_adjust_dx() {
+    return -(g_nScreenWidth - 800) / 2;
+}
+int get_adjust_dy() {
+    return -(g_nScreenHeight - 600) / 2 - g_nAdjustCenterY;
+}
+
 void set_screen_resolution(int nResolution, bool bSave);
 
 
@@ -71,17 +78,17 @@ public:
 };
 
 void CConfig::LoadGlobal_hook() {
-    CConfig::LoadGlobal_orig(this);
+    CConfig::LoadGlobal(this);
     g_nResolution = GetOpt_Int(CConfig::GLOBAL_OPT, "soScreenResolution", 0, 0, 4);
 }
 
 void CConfig::SaveGlobal_hook() {
-    CConfig::SaveGlobal_orig(this);
+    CConfig::SaveGlobal(this);
     SetOpt_Int(CConfig::GLOBAL_OPT, "soScreenResolution", g_nResolution);
 }
 
 void CConfig::ApplySysOpt_hook(void* pSysOpt, int bApplyVideo) {
-    CConfig::ApplySysOpt_orig(this, pSysOpt, bApplyVideo);
+    CConfig::ApplySysOpt(this, pSysOpt, bApplyVideo);
     if (pSysOpt && bApplyVideo && g_cbResolution) {
         set_screen_resolution(g_cbResolution->m_nSelect, true);
     }
@@ -95,7 +102,7 @@ public:
 };
 
 void CUISysOpt::OnCreate_hook(void* pData) {
-    CUISysOpt::OnCreate_orig(this, pData);
+    CUISysOpt::OnCreate(this, pData);
 
     CCtrlComboBox::CREATEPARAM paramComboBox;
     paramComboBox.nBackColor = 0xFFEEEEEE;
@@ -119,17 +126,21 @@ void CUISysOpt::OnCreate_hook(void* pData) {
 }
 
 void CUISysOpt::Destructor_hook() {
-    CUISysOpt::Destructor_orig(this);
+    CUISysOpt::Destructor(this);
     g_cbResolution = nullptr;
 }
 
 
-class CInputSystem {
+class CInputSystem : public TSingleton<CInputSystem, 0x00BEC33C> {
 public:
     MEMBER_AT(HWND, 0x0, m_hWnd)
     MEMBER_AT(IWzVector2DPtr, 0x9B0, m_pVectorCursor)
     MEMBER_HOOK(void, 0x0059A0CB, SetCursorVectorPos, int x, int y)
     MEMBER_HOOK(int, 0x0059A887, SetCursorPos, int x, int y)
+
+    int GetCursorPos(POINT* lpPoint) {
+        return ::GetCursorPos(lpPoint) && ::ScreenToClient(m_hWnd, lpPoint);
+    }
 };
 
 void CInputSystem::SetCursorVectorPos_hook(int x, int y) {
@@ -141,7 +152,7 @@ int CInputSystem::SetCursorPos_hook(int x, int y) {
     pt.x = zclamp(x, 0, get_screen_width());
     pt.y = zclamp(y, 0, get_screen_height());
     SetCursorVectorPos_hook(pt.x, pt.y);
-    return ClientToScreen(m_hWnd, &pt) && SetCursorPos(pt.x, pt.y);
+    return ::ClientToScreen(m_hWnd, &pt) && ::SetCursorPos(pt.x, pt.y);
 }
 
 
@@ -191,7 +202,24 @@ void __declspec(naked) CMapLoadable__MakeGrid_hook() {
 class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
 public:
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
+    MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField);
 };
+
+void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
+    if (CInputSystem::IsInstantiated()) {
+        CInputSystem::GetInstance()->GetCursorPos(lpPoint);
+        lpPoint->x += get_adjust_dx();
+        lpPoint->y += get_adjust_dy();
+        if (bField) {
+            lpPoint->x += m_pOrgWindow->x;
+            lpPoint->y += m_pOrgWindow->y;
+        }
+    }
+}
+
+class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
+};
+
 
 void set_screen_resolution(int nResolution, bool bSave) {
     int nScreenWidth = 800;
@@ -221,8 +249,9 @@ void set_screen_resolution(int nResolution, bool bSave) {
             g_nScreenHeight = nScreenHeight;
             g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
             gr->AdjustCenter(0, -g_nAdjustCenterY);
-            // CWndMan::ResetOrgWindow
-            CWndMan::GetInstance()->m_pOrgWindow->RelMove(get_screen_width() / -2, get_screen_height() / -2 - get_adjust_cy());
+            if (CSlideNotice::IsInstantiated()) {
+                CSlideNotice::GetInstance()->MoveWnd(get_adjust_dx(), get_adjust_dy());
+            }
             // CMapLoadable::OnEventChangeScreenResolution
             CMapLoadable* field = reinterpret_cast<CMapLoadable*(__cdecl*)()>(0x00437A0C)();
             if (field) {
@@ -246,7 +275,7 @@ void __declspec(naked) CUIToolTip__MakeLayer_hook1() {
         mov     eax, g_nScreenWidth
         sub     eax, 1
         jmp     [ CUIToolTip__MakeLayer_ret1 ]
-    };
+    }
 }
 
 static auto CUIToolTip__MakeLayer_jmp2 = 0x008F32DF;
@@ -256,34 +285,38 @@ void __declspec(naked) CUIToolTip__MakeLayer_hook2() {
         mov     eax, g_nScreenHeight
         sub     eax, 1
         jmp     [ CUIToolTip__MakeLayer_ret2 ]
-    };
+    }
 }
 
 
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
-    ATTACH_HOOK(CConfig::LoadGlobal_orig, CConfig::LoadGlobal_hook);
-    ATTACH_HOOK(CConfig::SaveGlobal_orig, CConfig::SaveGlobal_hook);
-    ATTACH_HOOK(CConfig::ApplySysOpt_orig, CConfig::ApplySysOpt_hook);
-    ATTACH_HOOK(CUISysOpt::OnCreate_orig, CUISysOpt::OnCreate_hook);
-    ATTACH_HOOK(CUISysOpt::Destructor_orig, CUISysOpt::Destructor_hook);
+    ATTACH_HOOK(CConfig::LoadGlobal, CConfig::LoadGlobal_hook);
+    ATTACH_HOOK(CConfig::SaveGlobal, CConfig::SaveGlobal_hook);
+    ATTACH_HOOK(CConfig::ApplySysOpt, CConfig::ApplySysOpt_hook);
+    ATTACH_HOOK(CUISysOpt::OnCreate, CUISysOpt::OnCreate_hook);
+    ATTACH_HOOK(CUISysOpt::Destructor, CUISysOpt::Destructor_hook);
     // CUISysOpt::OnCreate - hide monster info combo box
     Patch4(0x00994525 + 1, 0);
 
-    ATTACH_HOOK(CInputSystem::SetCursorVectorPos_orig, CInputSystem::SetCursorVectorPos_hook);
-    ATTACH_HOOK(CInputSystem::SetCursorPos_orig, CInputSystem::SetCursorPos_hook);
-    ATTACH_HOOK(CMapLoadable::RestoreViewRange_orig, CMapLoadable::RestoreViewRange_hook);
+    ATTACH_HOOK(CInputSystem::SetCursorVectorPos, CInputSystem::SetCursorVectorPos_hook);
+    ATTACH_HOOK(CInputSystem::SetCursorPos, CInputSystem::SetCursorPos_hook);
+    ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
-    // CWvsApp::CreateWndManager - maximum bounds for CWndMan
-    Patch4(0x009F707D + 1, 1920);
-    Patch4(0x009F7078 + 1, 1080);
-
-    // CUIToolTip::MakeLayer - maximum bounds for CUIToolTip
-    PatchJmp(CUIToolTip__MakeLayer_jmp1, &CUIToolTip__MakeLayer_hook1);
-    PatchJmp(CUIToolTip__MakeLayer_jmp2, &CUIToolTip__MakeLayer_hook2);
+    ATTACH_HOOK(CWndMan::GetCursorPos, CWndMan::GetCursorPos_hook);
 
     // CSlideNotice - sliding notice width
     Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
     Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
     Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
+
+    // CWnd::OnMoveWnd - disable snapping to screen bounds (TODO: snap to screen bound)
+    PatchJmp(0x009DFBFE, 0x009DFCC3);
+    PatchJmp(0x009DFD01, 0x009DFDAA);
+    PatchJmp(0x009DFDBB, 0x009DFE4D);
+    PatchJmp(0x009DFE7E, 0x009DFF29);
+
+    // CUIToolTip::MakeLayer - maximum bounds for CUIToolTip - TODO: adjust dx/dy
+    PatchJmp(CUIToolTip__MakeLayer_jmp1, &CUIToolTip__MakeLayer_hook1);
+    PatchJmp(CUIToolTip__MakeLayer_jmp2, &CUIToolTip__MakeLayer_hook2);
 }
