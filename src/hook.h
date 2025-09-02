@@ -103,9 +103,16 @@ void PatchJmp(T pAddress, U pDestination) {
 }
 
 template <typename T, typename U>
-void PatchCall(T pAddress, U pDestination) {
+void PatchCall(T pAddress, U pDestination, size_t uSize = 5) {
+    if (uSize < 5) {
+        ErrorMessage("Cannot PatchCall at 0x%08X with uSize = %d", TO_UINTPTR(pAddress), uSize);
+        return;
+    }
     Patch1(pAddress, 0xE8);
     Patch4(pAddress + 1, TO_UINTPTR(pDestination) - TO_UINTPTR(pAddress) - 5);
+    if (uSize > 5) {
+        PatchNop(pAddress + 5, pAddress + uSize);
+    }
 }
 
 template <typename T>

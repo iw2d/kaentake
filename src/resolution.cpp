@@ -398,6 +398,24 @@ void CTemporaryStatView::FindIcon_hook(POINT* ptCursor, int& nType, int& nID) {
 }
 
 
+HRESULT __stdcall CAvatarMegaphone__RelMove_hook1(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
+    nX = get_screen_width() + get_adjust_dx();
+    nY = get_adjust_dy();
+    return pThis->raw_RelMove(nX, nY, nTime, nType);
+}
+
+HRESULT __stdcall CAvatarMegaphone__RelMove_hook2(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
+    nX = get_screen_width() + get_adjust_dx() - 225;
+    nY = get_adjust_dy();
+    return pThis->raw_RelMove(nX, nY, nTime, nType);
+}
+
+
+class CWvsContext : public TSingleton<CWvsContext, 0x00BE7918> {
+public:
+    MEMBER_AT(CTemporaryStatView, 0x2EA8, m_temporaryStatView)
+};
+
 class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
 };
 
@@ -429,6 +447,9 @@ void set_screen_resolution(int nResolution, bool bSave) {
             g_nScreenHeight = nScreenHeight;
             g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
             gr->AdjustCenter(0, -g_nAdjustCenterY);
+            if (CWvsContext::IsInstantiated()) {
+                CWvsContext::GetInstance()->m_temporaryStatView.AdjustPosition_hook();
+            }
             if (CSlideNotice::IsInstantiated()) {
                 CSlideNotice::GetInstance()->MoveWnd(get_adjust_dx(), get_adjust_dy());
             }
@@ -485,4 +506,10 @@ void AttachResolutionMod() {
     Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
     Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
     Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
+
+    // CAvatarMegaphone - reposition avatar megaphone
+    PatchCall(0x0045B341, &CAvatarMegaphone__RelMove_hook1, 6); // CAvatarMegaphone::HelloAvatarMegaphone - start position
+    PatchCall(0x0045B421, &CAvatarMegaphone__RelMove_hook2, 6); // CAvatarMegaphone::HelloAvatarMegaphone - end position
+    PatchCall(0x0045B8A1, &CAvatarMegaphone__RelMove_hook2, 6); // CAvatarMegaphone::ByeAvatarMegaphone - start position
+    PatchCall(0x0045B985, &CAvatarMegaphone__RelMove_hook1, 6); // CAvatarMegaphone::ByeAvatarMegaphone - end position
 }
