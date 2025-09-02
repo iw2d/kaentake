@@ -13,6 +13,9 @@
 #include <windows.h>
 #include <strsafe.h>
 
+#define SCREEN_WIDTH_MAX 1920
+#define SCREEN_HEIGHT_MAX 1080
+
 
 static ZRef<CCtrlComboBox> g_cbResolution;
 static int g_nResolution = 0;
@@ -294,14 +297,14 @@ void __declspec(naked) CMapLoadable__MakeGrid_hook() {
 
 
 HRESULT __stdcall CField_LimitedView__raw_Copy_hook(IWzCanvas* pThis, int nDstLeft, int nDstTop, IWzCanvas* pSource, VARIANT nAlpha) {
-    nDstLeft = nDstLeft + (1920 / 2) - 400;
-    nDstTop = nDstTop + (1080 / 2) - 300 + ((1080 - 600) / 2);
+    nDstLeft = nDstLeft + (SCREEN_WIDTH_MAX / 2) - 400;
+    nDstTop = nDstTop + (SCREEN_HEIGHT_MAX / 2) - 300 + ((SCREEN_HEIGHT_MAX - 600) / 2);
     return pThis->raw_Copy(nDstLeft, nDstTop, pSource, nAlpha);
 }
 
 HRESULT __fastcall CField_LimitedView__CopyEx_hook(IWzCanvas* pThis, void* _EDX, int nDstLeft, int nDstTop, IWzCanvas* pSource, CANVAS_ALPHATYPE nAlpha, int nWidth, int nHeight, int nSrcLeft, int nSrcTop, int nSrcWidth, int nSrcHeight, const Ztl_variant_t& pAdjust) {
-    nDstLeft = nDstLeft + (1920 / 2) - 400;
-    nDstTop = nDstTop + (1080 / 2) - 300 + ((1080 - 600) / 2);
+    nDstLeft = nDstLeft + (SCREEN_WIDTH_MAX / 2) - 400;
+    nDstTop = nDstTop + (SCREEN_HEIGHT_MAX / 2) - 300 + ((SCREEN_HEIGHT_MAX - 600) / 2);
     return pThis->CopyEx(nDstLeft, nDstTop, pSource, nAlpha, nWidth, nHeight, nSrcLeft, nSrcTop, nSrcWidth, nSrcHeight, pAdjust);
 }
 
@@ -505,11 +508,11 @@ void AttachResolutionMod() {
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
 
     // CField_LimitedView::Init
-    Patch4(0x0055B808 + 1, 1080); // m_pCanvasDark->raw_Create - uHeight
-    Patch4(0x0055B80D + 1, 1920); // m_pCanvasDark->raw_Create - uWidth
-    Patch4(0x0055B884 + 1, 1080); // m_pCanvasDark->raw_DrawRectangle - uHeight
-    Patch4(0x0055BB2F + 1, -1080 / 2 - (1080 - 600) / 2); // m_pLayerDark->raw_RelMove - nY
-    Patch4(0x0055BB35 + 1, -1920 / 2); // m_pLayerDark->raw_RelMove - nX
+    Patch4(0x0055B808 + 1, SCREEN_HEIGHT_MAX); // m_pCanvasDark->raw_Create - uHeight
+    Patch4(0x0055B80D + 1, SCREEN_WIDTH_MAX); // m_pCanvasDark->raw_Create - uWidth
+    Patch4(0x0055B884 + 1, SCREEN_HEIGHT_MAX); // m_pCanvasDark->raw_DrawRectangle - uHeight
+    Patch4(0x0055BB2F + 1, -SCREEN_HEIGHT_MAX / 2 - (SCREEN_HEIGHT_MAX - 600) / 2); // m_pLayerDark->raw_RelMove - nY
+    Patch4(0x0055BB35 + 1, -SCREEN_WIDTH_MAX / 2); // m_pLayerDark->raw_RelMove - nX
     // CField_LimitedView::DrawViewRange
     PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
     PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);
@@ -540,7 +543,7 @@ void AttachResolutionMod() {
 
     // CSlideNotice - sliding notice position and width
     ATTACH_HOOK(CSlideNotice::SetMsg, CSlideNotice::SetMsg_hook);
-    Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
-    Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
-    Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
+    Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice
+    Patch4(0x007E16BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::OnCreate
+    Patch4(0x007E1E07 + 2, SCREEN_WIDTH_MAX); // CSlideNotice::SetMsg
 }
