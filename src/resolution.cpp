@@ -227,6 +227,34 @@ int CInputSystem::SetCursorPos_hook(int x, int y) {
 }
 
 
+class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
+public:
+    MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
+    MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField)
+    MEMBER_HOOK(IUIMsgHandler*, 0x009E42B2, GetHandlerFromPoint, int x, int y)
+};
+
+void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
+    if (CInputSystem::IsInstantiated()) {
+        CInputSystem::GetInstance()->GetCursorPos(lpPoint);
+        lpPoint->x += get_adjust_dx();
+        lpPoint->y += get_adjust_dy();
+        if (bField) {
+            lpPoint->x += m_pOrgWindow->x;
+            lpPoint->y += m_pOrgWindow->y;
+        }
+    }
+}
+
+IUIMsgHandler* CWndMan::GetHandlerFromPoint_hook(int x, int y) {
+    IUIMsgHandler* pHandler = CWndMan::GetHandlerFromPoint(this, x, y);
+    if (!pHandler && x >= get_adjust_dx() && x < get_screen_width() + get_adjust_dx() && y >= get_adjust_dy() && y < get_screen_height() + get_adjust_dy()) {
+        return CWndMan::GetInstance();
+    }
+    return pHandler;
+}
+
+
 class CWvsPhysicalSpace2D : public TSingleton<CWvsPhysicalSpace2D, 0x00BEBFA0> {
 public:
     MEMBER_AT(RECT, 0x24, m_rcMBR)
@@ -265,31 +293,16 @@ void __declspec(naked) CMapLoadable__MakeGrid_hook() {
 }
 
 
-class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
-public:
-    MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
-    MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField)
-    MEMBER_HOOK(IUIMsgHandler*, 0x009E42B2, GetHandlerFromPoint, int x, int y)
-};
-
-void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
-    if (CInputSystem::IsInstantiated()) {
-        CInputSystem::GetInstance()->GetCursorPos(lpPoint);
-        lpPoint->x += get_adjust_dx();
-        lpPoint->y += get_adjust_dy();
-        if (bField) {
-            lpPoint->x += m_pOrgWindow->x;
-            lpPoint->y += m_pOrgWindow->y;
-        }
-    }
+HRESULT __stdcall CField_LimitedView__raw_Copy_hook(IWzCanvas* pThis, int nDstLeft, int nDstTop, IWzCanvas* pSource, VARIANT nAlpha) {
+    nDstLeft = nDstLeft + (1920 / 2) - 400;
+    nDstTop = nDstTop + (1080 / 2) - 300 + ((1080 - 600) / 2);
+    return pThis->raw_Copy(nDstLeft, nDstTop, pSource, nAlpha);
 }
 
-IUIMsgHandler* CWndMan::GetHandlerFromPoint_hook(int x, int y) {
-    IUIMsgHandler* pHandler = CWndMan::GetHandlerFromPoint(this, x, y);
-    if (!pHandler && x >= get_adjust_dx() && x < get_screen_width() + get_adjust_dx() && y >= get_adjust_dy() && y < get_screen_height() + get_adjust_dy()) {
-        return CWndMan::GetInstance();
-    }
-    return pHandler;
+HRESULT __fastcall CField_LimitedView__CopyEx_hook(IWzCanvas* pThis, void* _EDX, int nDstLeft, int nDstTop, IWzCanvas* pSource, CANVAS_ALPHATYPE nAlpha, int nWidth, int nHeight, int nSrcLeft, int nSrcTop, int nSrcWidth, int nSrcHeight, const Ztl_variant_t& pAdjust) {
+    nDstLeft = nDstLeft + (1920 / 2) - 400;
+    nDstTop = nDstTop + (1080 / 2) - 300 + ((1080 - 600) / 2);
+    return pThis->CopyEx(nDstLeft, nDstTop, pSource, nAlpha, nWidth, nHeight, nSrcLeft, nSrcTop, nSrcWidth, nSrcHeight, pAdjust);
 }
 
 
@@ -394,13 +407,13 @@ void CTemporaryStatView::FindIcon_hook(POINT* ptCursor, int& nType, int& nID) {
 }
 
 
-HRESULT __stdcall CAvatarMegaphone__RelMove_hook1(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
+HRESULT __stdcall CAvatarMegaphone__raw_RelMove_hook1(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
     nX = get_screen_width() + get_adjust_dx();
     nY = get_adjust_dy();
     return pThis->raw_RelMove(nX, nY, nTime, nType);
 }
 
-HRESULT __stdcall CAvatarMegaphone__RelMove_hook2(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
+HRESULT __stdcall CAvatarMegaphone__raw_RelMove_hook2(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
     nX = get_screen_width() + get_adjust_dx() - 225;
     nY = get_adjust_dy();
     return pThis->raw_RelMove(nX, nY, nTime, nType);
@@ -484,10 +497,25 @@ void AttachResolutionMod() {
 
     ATTACH_HOOK(CInputSystem::SetCursorVectorPos, CInputSystem::SetCursorVectorPos_hook);
     ATTACH_HOOK(CInputSystem::SetCursorPos, CInputSystem::SetCursorPos_hook);
-    ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
-    PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
     ATTACH_HOOK(CWndMan::GetCursorPos, CWndMan::GetCursorPos_hook);
     ATTACH_HOOK(CWndMan::GetHandlerFromPoint, CWndMan::GetHandlerFromPoint_hook);
+
+    // CMapLoadable - handle view range
+    ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
+    PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
+
+    // CField_LimitedView::Init
+    Patch4(0x0055B808 + 1, 1080); // m_pCanvasDark->raw_Create - uHeight
+    Patch4(0x0055B80D + 1, 1920); // m_pCanvasDark->raw_Create - uWidth
+    Patch4(0x0055B884 + 1, 1080); // m_pCanvasDark->raw_DrawRectangle - uHeight
+    Patch4(0x0055BB2F + 1, -1080 / 2 - (1080 - 600) / 2); // m_pLayerDark->raw_RelMove - nY
+    Patch4(0x0055BB35 + 1, -1920 / 2); // m_pLayerDark->raw_RelMove - nX
+    // CField_LimitedView::DrawViewRange
+    PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
+    PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);
+    PatchCall(0x0055C1DD, &CField_LimitedView__CopyEx_hook);
+
+    // PatchCall(0x0055BB3F, CField_LimitedView_RelMove_hook, 6); // m_pLayerDark->raw_RelMove(-400, -300);
 
     // CWnd::OnMoveWnd - handle snapping to screen bounds
     ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
@@ -505,10 +533,10 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
 
     // CAvatarMegaphone - reposition avatar megaphone
-    PatchCall(0x0045B341, &CAvatarMegaphone__RelMove_hook1, 6); // CAvatarMegaphone::HelloAvatarMegaphone - start position
-    PatchCall(0x0045B421, &CAvatarMegaphone__RelMove_hook2, 6); // CAvatarMegaphone::HelloAvatarMegaphone - end position
-    PatchCall(0x0045B8A1, &CAvatarMegaphone__RelMove_hook2, 6); // CAvatarMegaphone::ByeAvatarMegaphone - start position
-    PatchCall(0x0045B985, &CAvatarMegaphone__RelMove_hook1, 6); // CAvatarMegaphone::ByeAvatarMegaphone - end position
+    PatchCall(0x0045B341, &CAvatarMegaphone__raw_RelMove_hook1, 6); // CAvatarMegaphone::HelloAvatarMegaphone - start position
+    PatchCall(0x0045B421, &CAvatarMegaphone__raw_RelMove_hook2, 6); // CAvatarMegaphone::HelloAvatarMegaphone - end position
+    PatchCall(0x0045B8A1, &CAvatarMegaphone__raw_RelMove_hook2, 6); // CAvatarMegaphone::ByeAvatarMegaphone - start position
+    PatchCall(0x0045B985, &CAvatarMegaphone__raw_RelMove_hook1, 6); // CAvatarMegaphone::ByeAvatarMegaphone - end position
 
     // CSlideNotice - sliding notice position and width
     ATTACH_HOOK(CSlideNotice::SetMsg, CSlideNotice::SetMsg_hook);
