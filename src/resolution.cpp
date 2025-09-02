@@ -245,12 +245,14 @@ void CMapLoadable::RestoreViewRange_hook() {
     m_rcViewRange.right = get_int32(m_pPropFieldInfo->item[L"VRRight"], pSpace2D->m_rcMBR.right + 20) - get_screen_width() / 2;
     m_rcViewRange.bottom = get_int32(m_pPropFieldInfo->item[L"VRBottom"], pSpace2D->m_rcMBR.bottom + 190) - get_screen_height() / 2;
     if (m_rcViewRange.right - m_rcViewRange.left <= 0) {
-        m_rcViewRange.left = (m_rcViewRange.left + m_rcViewRange.right) / 2;
-        m_rcViewRange.right = (m_rcViewRange.left + m_rcViewRange.right) / 2;
+        int mid = (m_rcViewRange.left + m_rcViewRange.right) / 2;
+        m_rcViewRange.left = mid;
+        m_rcViewRange.right = mid;
     }
     if (m_rcViewRange.bottom - m_rcViewRange.top <= 0) {
-        m_rcViewRange.top = (m_rcViewRange.top + m_rcViewRange.bottom) / 2;
-        m_rcViewRange.bottom = (m_rcViewRange.top + m_rcViewRange.bottom) / 2;
+        int mid = (m_rcViewRange.top + m_rcViewRange.bottom) / 2;
+        m_rcViewRange.top = mid;
+        m_rcViewRange.bottom = mid;
     }
     m_rcViewRange.top += get_adjust_cy();
     m_rcViewRange.bottom += get_adjust_cy();
