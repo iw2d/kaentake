@@ -6,7 +6,6 @@
 
 class CStage : public IGObj, public IUIMsgHandler, public INetMsgHandler, public ZRefCounted {
 public:
-    CStage() = default;
     virtual void Init(void* pParam) {}
     virtual void Close() {}
 };

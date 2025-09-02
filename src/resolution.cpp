@@ -366,13 +366,6 @@ IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nT
 
 class CTemporaryStatView {
 public:
-    enum {
-        TSV_NONE = 0x0,
-        TSV_ITEM = 0x1,
-        TSV_SKILL = 0x2,
-        TSV_ETC = 0x3,
-        TSV_PRIVILEGE = 0x4,
-    };
     struct TEMPORARY_STAT : public ZRefCounted {
         unsigned char pad0[0x40 - sizeof(ZRefCounted)];
         MEMBER_AT(int, 0x1C, nType)
@@ -517,8 +510,6 @@ void AttachResolutionMod() {
     PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
     PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);
     PatchCall(0x0055C1DD, &CField_LimitedView__CopyEx_hook);
-
-    // PatchCall(0x0055BB3F, CField_LimitedView_RelMove_hook, 6); // m_pLayerDark->raw_RelMove(-400, -300);
 
     // CWnd::OnMoveWnd - handle snapping to screen bounds
     ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
