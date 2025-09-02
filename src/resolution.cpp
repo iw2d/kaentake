@@ -2,6 +2,7 @@
 #include "wvs/wnd.h"
 #include "wvs/ctrlwnd.h"
 #include "wvs/stage.h"
+#include "wvs/field.h"
 #include "wvs/rtti.h"
 #include "wvs/util.h"
 #include "ztl/zalloc.h"
@@ -231,13 +232,6 @@ public:
     MEMBER_AT(RECT, 0x24, m_rcMBR)
 };
 
-class CMapLoadable {
-public:
-    MEMBER_AT(IWzPropertyPtr, 0x2C, m_pPropFieldInfo)
-    MEMBER_AT(RECT, 0xF0, m_rcViewRange)
-    MEMBER_HOOK(void, 0x00641EF1, RestoreViewRange)
-};
-
 void CMapLoadable::RestoreViewRange_hook() {
     auto pSpace2D = CWvsPhysicalSpace2D::GetInstance();
     m_rcViewRange.left = get_int32(m_pPropFieldInfo->item[L"VRLeft"], pSpace2D->m_rcMBR.left - 20) + get_screen_width() / 2;
@@ -413,12 +407,20 @@ HRESULT __stdcall CAvatarMegaphone__RelMove_hook2(IWzGr2DLayer* pThis, int nX, i
 }
 
 
+class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
+public:
+    MEMBER_HOOK(void, 0x007E16FE, SetMsg, void* sNotice) // ZXString<char>
+};
+
+void CSlideNotice::SetMsg_hook(void* sNotice) {
+    CSlideNotice::SetMsg(this, sNotice);
+    MoveWnd(get_adjust_dx(), get_adjust_dy());
+}
+
+
 class CWvsContext : public TSingleton<CWvsContext, 0x00BE7918> {
 public:
     MEMBER_AT(CTemporaryStatView, 0x2EA8, m_temporaryStatView)
-};
-
-class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
 };
 
 void set_screen_resolution(int nResolution, bool bSave) {
@@ -449,19 +451,17 @@ void set_screen_resolution(int nResolution, bool bSave) {
             g_nScreenHeight = nScreenHeight;
             g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
             gr->AdjustCenter(0, -g_nAdjustCenterY);
-            if (CWvsContext::IsInstantiated()) {
-                CWvsContext::GetInstance()->m_temporaryStatView.AdjustPosition_hook();
-            }
             if (CSlideNotice::IsInstantiated()) {
                 CSlideNotice::GetInstance()->MoveWnd(get_adjust_dx(), get_adjust_dy());
             }
-            // CMapLoadable::OnEventChangeScreenResolution
-            CMapLoadable* field = reinterpret_cast<CMapLoadable*(__cdecl*)()>(0x00437A0C)(); // get_field();
+            if (CWvsContext::IsInstantiated()) {
+                CWvsContext::GetInstance()->m_temporaryStatView.AdjustPosition_hook();
+            }
+            CField* field = get_field();
             if (field) {
-                // CMapLoadable::RestoreViewRange
+                // CMapLoadable::OnEventChangeScreenResolution
                 field->RestoreViewRange_hook();
-                // CMapLoadable::ReloadBack
-                reinterpret_cast<void(__thiscall*)(CMapLoadable*)>(0x00644491)(field);
+                field->ReloadBack();
             }
         }
     }
@@ -504,14 +504,15 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CTemporaryStatView::ShowToolTip, CTemporaryStatView::ShowToolTip_hook);
     ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
 
-    // CSlideNotice - sliding notice width
-    Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
-    Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
-    Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
-
     // CAvatarMegaphone - reposition avatar megaphone
     PatchCall(0x0045B341, &CAvatarMegaphone__RelMove_hook1, 6); // CAvatarMegaphone::HelloAvatarMegaphone - start position
     PatchCall(0x0045B421, &CAvatarMegaphone__RelMove_hook2, 6); // CAvatarMegaphone::HelloAvatarMegaphone - end position
     PatchCall(0x0045B8A1, &CAvatarMegaphone__RelMove_hook2, 6); // CAvatarMegaphone::ByeAvatarMegaphone - start position
     PatchCall(0x0045B985, &CAvatarMegaphone__RelMove_hook1, 6); // CAvatarMegaphone::ByeAvatarMegaphone - end position
+
+    // CSlideNotice - sliding notice position and width
+    ATTACH_HOOK(CSlideNotice::SetMsg, CSlideNotice::SetMsg_hook);
+    Patch4(0x007E15BE + 1, 1920); // CSlideNotice::CSlideNotice
+    Patch4(0x007E16BE + 1, 1920); // CSlideNotice::OnCreate
+    Patch4(0x007E1E07 + 2, 1920); // CSlideNotice::SetMsg
 }
