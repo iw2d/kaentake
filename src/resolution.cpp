@@ -13,7 +13,7 @@
 #include <windows.h>
 #include <strsafe.h>
 
-#define SCREEN_WIDTH_MAX 1920
+#define SCREEN_WIDTH_MAX  1920
 #define SCREEN_HEIGHT_MAX 1080
 
 
@@ -40,6 +40,71 @@ int get_adjust_dx() {
 }
 int get_adjust_dy() {
     return -(g_nScreenHeight - 600) / 2 - g_nAdjustCenterY;
+}
+
+void get_default_position(int nUIType, int* pnDefaultX, int* pnDefaultY) {
+    int nDefaultX;
+    int nDefaultY;
+    switch (nUIType) {
+    case 4:
+        nDefaultX = 8;
+        nDefaultY = 8;
+        break;
+    case 8:
+        nDefaultX = 500;
+        nDefaultY = 50;
+        break;
+    case 9:
+    case 22:
+        nDefaultX = (nUIType == 9) ? 250 : 500;
+        nDefaultY = 100;
+        break;
+    case 14:
+        nDefaultX = 600;
+        nDefaultY = 35;
+        break;
+    case 15:
+        nDefaultX = 730;
+        nDefaultY = 400;
+        break;
+    case 18:
+        nDefaultX = 11;
+        nDefaultY = 24;
+        break;
+    case 20:
+        nDefaultX = 720;
+        nDefaultY = 80;
+        break;
+    case 23:
+    case 31:
+    case 33:
+        nDefaultX = 100;
+        nDefaultY = 100;
+        break;
+    case 24:
+    case 25:
+    case 26:
+    case 27:
+    case 29:
+    case 32:
+        nDefaultX = 244;
+        nDefaultY = 105;
+        break;
+    case 30:
+        nDefaultX = 769;
+        nDefaultY = 343;
+        break;
+    default:
+        nDefaultX = 8 * (3 * nUIType + 3);
+        nDefaultY = nDefaultX;
+        break;
+    }
+    if (pnDefaultX) {
+        *pnDefaultX = nDefaultX + get_adjust_dx();
+    }
+    if (pnDefaultY) {
+        *pnDefaultY = nDefaultY + get_adjust_dy();
+    }
 }
 
 void set_screen_resolution(int nResolution, bool bSave);
@@ -87,67 +152,15 @@ public:
 void CConfig::LoadCharacter_hook(int nWorldID, unsigned int dwCharacterId) {
     CConfig::LoadCharacter(this, nWorldID, dwCharacterId);
     for (size_t i = 0; i < 34; ++i) {
-        char sBuffer[1024];
         int nDefaultX;
         int nDefaultY;
-        switch (i) {
-        case 4:
-            nDefaultX = 8;
-            nDefaultY = 8;
-            break;
-        case 8:
-            nDefaultX = 500;
-            nDefaultY = 50;
-            break;
-        case 9:
-        case 22:
-            nDefaultX = (i == 9) ? 250 : 500;
-            nDefaultY = 100;
-            break;
-        case 14:
-            nDefaultX = 600;
-            nDefaultY = 35;
-            break;
-        case 15:
-            nDefaultX = 730;
-            nDefaultY = 400;
-            break;
-        case 18:
-            nDefaultX = 11;
-            nDefaultY = 24;
-            break;
-        case 20:
-            nDefaultX = 720;
-            nDefaultY = 80;
-            break;
-        case 23:
-        case 31:
-        case 33:
-            nDefaultX = 100;
-            nDefaultY = 100;
-            break;
-        case 24:
-        case 25:
-        case 26:
-        case 27:
-        case 29:
-        case 32:
-            nDefaultX = 244;
-            nDefaultY = 105;
-            break;
-        case 30:
-            nDefaultX = 769;
-            nDefaultY = 343;
-            break;
-        default:
-            nDefaultX = 8 * (3 * i + 3);
-            nDefaultY = nDefaultX;
-            break;
-        }
+        get_default_position(i, &nDefaultX, &nDefaultY);
+
+        char sBuffer[1024];
         sprintf_s(sBuffer, 1024, "uiWndX%d", i);
-        m_nUIWnd_X[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultX - get_adjust_dx(), get_adjust_dx() - 5, get_screen_width() + get_adjust_dx() - 6);
+        m_nUIWnd_X[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultX, get_adjust_dx() - 5, get_screen_width() + get_adjust_dx() - 6);
         sprintf_s(sBuffer, 1024, "uiWndY%d", i);
-        m_nUIWnd_Y[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultY - get_adjust_dy(), get_adjust_dy() - 5, get_screen_height() + get_adjust_dy() - 6);
+        m_nUIWnd_Y[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultY, get_adjust_dy() - 5, get_screen_height() + get_adjust_dy() - 6);
     }
 }
 
@@ -232,6 +245,8 @@ int CInputSystem::SetCursorPos_hook(int x, int y) {
 
 class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
 public:
+    inline static ZList<CWnd*>& ms_lpWindow = *reinterpret_cast<ZList<CWnd*>*>(0x00BF1648);
+
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
     MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField)
     MEMBER_HOOK(IUIMsgHandler*, 0x009E42B2, GetHandlerFromPoint, int x, int y)
@@ -460,6 +475,30 @@ void set_screen_resolution(int nResolution, bool bSave) {
             g_nScreenHeight = nScreenHeight;
             g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
             gr->AdjustCenter(0, -g_nAdjustCenterY);
+            if (CConfig::IsInstantiated()) {
+                auto pos = CWndMan::ms_lpWindow.GetHeadPosition();
+                while (pos) {
+                    auto pNext = CWndMan::ms_lpWindow.GetNext(pos);
+                    // (pNext == CUIStatusBar::GetInstance() || pNext->IsKindOf(CUIWnd::ms_RTTI_CUIWnd))
+                    if (pNext == reinterpret_cast<CWnd*>(0x00BEC208) || !pNext->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BF11DC))) {
+                        continue;
+                    }
+                    // Check window position
+                    if (pNext->GetAbsLeft() > get_adjust_dx() - 5 && pNext->GetAbsLeft() < get_screen_width() + get_adjust_dx() - 6 &&
+                            pNext->GetAbsTop() > get_adjust_dy() - 5 && pNext->GetAbsTop() < get_screen_height() + get_adjust_dy() - 6) {
+                        continue;
+                    }
+                    // Reposition window
+                    auto pUIWnd = reinterpret_cast<CUIWnd*>(pNext);
+                    int nUIType = pUIWnd->m_nUIType;
+                    int nDefaultX;
+                    int nDefaultY;
+                    get_default_position(nUIType, &nDefaultX, &nDefaultY);
+                    CConfig::GetInstance()->m_nUIWnd_X[nUIType] = nDefaultX;
+                    CConfig::GetInstance()->m_nUIWnd_Y[nUIType] = nDefaultY;
+                    pUIWnd->MoveWnd(nDefaultX, nDefaultY);
+                }
+            }
             if (CSlideNotice::IsInstantiated()) {
                 CSlideNotice::GetInstance()->MoveWnd(get_adjust_dx(), get_adjust_dy());
             }
@@ -501,11 +540,11 @@ void AttachResolutionMod() {
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
 
     // CField_LimitedView::Init
-    Patch4(0x0055B808 + 1, SCREEN_HEIGHT_MAX); // m_pCanvasDark->raw_Create - uHeight
-    Patch4(0x0055B80D + 1, SCREEN_WIDTH_MAX); // m_pCanvasDark->raw_Create - uWidth
-    Patch4(0x0055B884 + 1, SCREEN_HEIGHT_MAX); // m_pCanvasDark->raw_DrawRectangle - uHeight
+    Patch4(0x0055B808 + 1, SCREEN_HEIGHT_MAX);                                      // m_pCanvasDark->raw_Create - uHeight
+    Patch4(0x0055B80D + 1, SCREEN_WIDTH_MAX);                                       // m_pCanvasDark->raw_Create - uWidth
+    Patch4(0x0055B884 + 1, SCREEN_HEIGHT_MAX);                                      // m_pCanvasDark->raw_DrawRectangle - uHeight
     Patch4(0x0055BB2F + 1, -SCREEN_HEIGHT_MAX / 2 - (SCREEN_HEIGHT_MAX - 600) / 2); // m_pLayerDark->raw_RelMove - nY
-    Patch4(0x0055BB35 + 1, -SCREEN_WIDTH_MAX / 2); // m_pLayerDark->raw_RelMove - nX
+    Patch4(0x0055BB35 + 1, -SCREEN_WIDTH_MAX / 2);                                  // m_pLayerDark->raw_RelMove - nX
     // CField_LimitedView::DrawViewRange
     PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
     PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);

@@ -28,6 +28,9 @@ public:
     virtual void Draw(const RECT* pRect) {}
     virtual int IsMyAddOn() { return 0; }
 
+    IWzGr2DLayerPtr GetLayer() {
+        return m_pLayer;
+    }
     IWzCanvasPtr GetCanvas() {
         if (m_pOverlabLayer) {
             return m_pOverlabLayer->canvas[0];
@@ -47,4 +50,12 @@ public:
     void InvalidateRect(const RECT* pRect) {
         reinterpret_cast<void(__thiscall*)(CWnd*, const RECT*)>(0x009E04C9)(this, pRect);
     }
+};
+
+
+class CUIWnd : public CWnd {
+public:
+    MEMBER_AT(int, 0x588, m_nUIType)
+
+    virtual void OnCreate(void* pData, void* sUOL, int bMultiBg) {}
 };
