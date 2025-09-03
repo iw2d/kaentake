@@ -347,6 +347,28 @@ void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
     }
 }
 
+static auto CWnd__CreateWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int, int, int, int, int, void*, int)>(0x009DE4D2);
+void __fastcall CWnd__CreateWnd_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
+    CWnd__CreateWnd(pThis, l, t - get_adjust_cy(), w, h, z, bScreenCoord, pData, bSetFocus);
+}
+
+
+class CUtilDlgEx : public CWnd {
+public:
+    MEMBER_AT(int, 0x98, m_wndWidth)
+    MEMBER_AT(int, 0x9C, m_wndHeight)
+    MEMBER_HOOK(void, 0x009A3E38, CreateUtilDlgEx)
+};
+
+static RECT& sRectQuestDlg = *reinterpret_cast<RECT*>(0x00BE2DF0);
+
+void CUtilDlgEx::CreateUtilDlgEx_hook() {
+    int nLeft = zclamp<int>(sRectQuestDlg.left - m_wndWidth / 2, get_adjust_dx(), get_screen_width() + get_adjust_dx());
+    int nTop = zclamp<int>(sRectQuestDlg.top - m_wndHeight / 2, get_adjust_dy(), get_screen_height() + get_adjust_dy());
+    // CDialog::CreateDlg(this, nLeft, nTop, m_wndWidth, m_wndHeight, 10, 1, 0);
+    CWnd__CreateWnd(this, nLeft, nTop, m_wndWidth, m_wndHeight, 10, 1, nullptr, 1);
+}
+
 
 class CUIToolTip {
 public:
@@ -475,7 +497,11 @@ void set_screen_resolution(int nResolution, bool bSave) {
             g_nScreenHeight = nScreenHeight;
             g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
             gr->AdjustCenter(0, -g_nAdjustCenterY);
-            if (CConfig::IsInstantiated()) {
+            // Adjust CUtilDlgEx position
+            sRectQuestDlg.top = get_screen_height() / 2 + get_adjust_dy();
+            sRectQuestDlg.left = get_screen_width() / 2 + get_adjust_dx();
+            // Reposition open windows
+            if (CWndMan::IsInstantiated()) {
                 auto pos = CWndMan::ms_lpWindow.GetHeadPosition();
                 while (pos) {
                     auto pNext = CWndMan::ms_lpWindow.GetNext(pos);
@@ -483,19 +509,15 @@ void set_screen_resolution(int nResolution, bool bSave) {
                     if (pNext == reinterpret_cast<CWnd*>(0x00BEC208) || !pNext->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BF11DC))) {
                         continue;
                     }
-                    // Check window position
                     if (pNext->GetAbsLeft() > get_adjust_dx() - 5 && pNext->GetAbsLeft() < get_screen_width() + get_adjust_dx() - 6 &&
                             pNext->GetAbsTop() > get_adjust_dy() - 5 && pNext->GetAbsTop() < get_screen_height() + get_adjust_dy() - 6) {
                         continue;
                     }
-                    // Reposition window
                     auto pUIWnd = reinterpret_cast<CUIWnd*>(pNext);
                     int nUIType = pUIWnd->m_nUIType;
                     int nDefaultX;
                     int nDefaultY;
                     get_default_position(nUIType, &nDefaultX, &nDefaultY);
-                    CConfig::GetInstance()->m_nUIWnd_X[nUIType] = nDefaultX;
-                    CConfig::GetInstance()->m_nUIWnd_Y[nUIType] = nDefaultY;
                     pUIWnd->MoveWnd(nDefaultX, nDefaultY);
                 }
             }
@@ -556,6 +578,13 @@ void AttachResolutionMod() {
     PatchJmp(0x009DFD01, 0x009DFDAA);
     PatchJmp(0x009DFDBB, 0x009DFE4D);
     PatchJmp(0x009DFE7E, 0x009DFF29);
+    // CWnd::CreateWnd - reposition dialogs
+    PatchCall(0x004EDAE6, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, int, int, int, void*)
+    PatchCall(0x004EDB95, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
+
+    // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
+    ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);
+
 
     // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
     ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);

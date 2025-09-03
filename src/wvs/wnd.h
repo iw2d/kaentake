@@ -13,6 +13,8 @@ class CWnd : public IGObj, public IUIMsgHandler, public ZRefCounted {
 public:
     MEMBER_AT(IWzGr2DLayerPtr, 0x18, m_pLayer)
     MEMBER_AT(IWzGr2DLayerPtr, 0x20, m_pOverlabLayer)
+    MEMBER_AT(int, 0x24, m_width)
+    MEMBER_AT(int, 0x24, m_height)
 
     virtual void Update() override {}
     virtual int OnDragDrop(int nState, DRAGCTX& ctx, int rx, int ry) { return 0; }
@@ -40,15 +42,6 @@ public:
     }
     void MoveWnd(int l, int t) {
         m_pLayer->RelMove(l, t);
-    }
-    void CreateWnd(int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
-        reinterpret_cast<void(__thiscall*)(CWnd*, int, int, int, int, int, int, void*, int)>(0x009DE4D2)(this, l, t, w, h, z, bScreenCoord, pData, bSetFocus);
-    }
-    void Destroy() {
-        reinterpret_cast<void(__thiscall*)(CWnd*)>(0x009E00AF)(this);
-    }
-    void InvalidateRect(const RECT* pRect) {
-        reinterpret_cast<void(__thiscall*)(CWnd*, const RECT*)>(0x009E04C9)(this, pRect);
     }
 };
 
