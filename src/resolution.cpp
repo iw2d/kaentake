@@ -585,7 +585,6 @@ void AttachResolutionMod() {
     // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
     ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);
 
-
     // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
     ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
 
@@ -605,4 +604,7 @@ void AttachResolutionMod() {
     Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice
     Patch4(0x007E16BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::OnCreate
     Patch4(0x007E1E07 + 2, SCREEN_WIDTH_MAX); // CSlideNotice::SetMsg
+
+    // Gr2D_DX9.dll - disable window repositioning function as it does not account for multiple monitors
+    PatchRetZero(GetAddressByPattern("GR2D_DX9.DLL", "56 8B F1 8B 86 A8 00 00 00"));
 }

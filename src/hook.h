@@ -84,7 +84,7 @@ void Patch4(T pAddress, unsigned int uValue) {
 
 template <typename T>
 void PatchStr(T pAddress, const char* sValue) {
-    PatchMemory(TO_PVOID(pAddress), &uValue, strlen(sValue));
+    PatchMemory(TO_PVOID(pAddress), TO_PVOID(sValue), strlen(sValue));
 }
 
 template <typename T, typename U>
