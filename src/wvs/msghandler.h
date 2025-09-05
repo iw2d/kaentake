@@ -6,7 +6,7 @@ class IDraggable;
 
 class IUIMsgHandler {
 public:
-    inline static CRTTI& ms_RTTI_IUIMsgHandler = *reinterpret_cast<CRTTI*>(0x00C6B348);
+    inline static CRTTI& ms_RTTI_IUIMsgHandler = *reinterpret_cast<CRTTI*>(0x00BEDBB8);
 
     virtual void OnKey(unsigned int wParam, unsigned int lParam) {}
     virtual int OnSetFocus(int bFocus) { return 0; }
