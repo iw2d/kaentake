@@ -541,6 +541,33 @@ void set_screen_resolution(int nResolution, bool bSave) {
 }
 
 
+class CWzGr2D_DX9 {
+public:
+    MEMBER_AT(int, 0x54, m_bWindow)
+    MEMBER_AT(int, 0x98, m_nScreenLeft)
+    MEMBER_AT(int, 0x9C, m_nScreenTop)
+    MEMBER_AT(HWND, 0xA8, m_hWnd)
+};
+
+static void* CWzGr2D_DX9__RepositionWindow;
+void __fastcall CWzGr2D_DX9__RepositionWindow_hook(CWzGr2D_DX9* pThis, void* _EDX) {
+    LONG lStyle = GetWindowLongA(pThis->m_hWnd, GWL_STYLE);
+    if ((lStyle & WS_CHILD) != 0) {
+        return;
+    }
+    UINT uFlags;
+    if (pThis->m_bWindow) {
+        lStyle = lStyle & 0x7F35FFFF | 0xCA0000;
+        uFlags = 0x29;
+    } else {
+        lStyle = 0x80080000;
+        uFlags = 0x2B;
+    }
+    SetWindowLongA(pThis->m_hWnd, GWL_STYLE, lStyle);
+    SetWindowPos(pThis->m_hWnd, pThis->m_bWindow ? HWND_NOTOPMOST : HWND_TOPMOST, pThis->m_nScreenLeft, pThis->m_nScreenTop, 0, 0, uFlags);
+}
+
+
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
     ATTACH_HOOK(CConfig::LoadCharacter, CConfig::LoadCharacter_hook);
@@ -605,6 +632,7 @@ void AttachResolutionMod() {
     Patch4(0x007E16BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::OnCreate
     Patch4(0x007E1E07 + 2, SCREEN_WIDTH_MAX); // CSlideNotice::SetMsg
 
-    // Gr2D_DX9.dll - disable window repositioning function as it does not account for multiple monitors
-    PatchRetZero(GetAddressByPattern("GR2D_DX9.DLL", "56 8B F1 8B 86 A8 00 00 00"));
+    // Gr2D_DX9.dll - reimplement window repositioning function as it does not account for multiple monitors
+    CWzGr2D_DX9__RepositionWindow = GetAddressByPattern("GR2D_DX9.DLL", "56 8B F1 8B 86 A8 00 00 00");
+    ATTACH_HOOK(CWzGr2D_DX9__RepositionWindow, CWzGr2D_DX9__RepositionWindow_hook);
 }
