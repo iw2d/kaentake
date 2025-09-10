@@ -1,7 +1,6 @@
 #pragma once
 #include "hook.h"
 #include "wvs/stage.h"
-#include "ztl/tsingleton.h"
 
 
 class CMapLoadable : public CStage {

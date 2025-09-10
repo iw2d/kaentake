@@ -49,7 +49,7 @@ void*& ZAllocBase::_NextHeadBlock(void* p) {
 }
 
 
-ZRefCounted* _Set1(ZRefCounted* p) {
+ZRefCounted* ZRefCountedAccessorBase::_Set1(ZRefCounted* p) {
     InterlockedExchange(&p->_m_nRef, 1);
     return p;
 }

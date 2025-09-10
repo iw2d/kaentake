@@ -4,6 +4,8 @@
 
 ZALLOC_GLOBAL
 ZALLOCEX(ZAllocAnonSelector, 0x00BF0B00)
+ZALLOCEX(ZAllocStrSelector<char>, 0x00BF0A90)
+ZALLOCEX(ZAllocStrSelector<wchar_t>, 0x00BF0BA8)
 
 extern "C" __declspec(dllexport) VOID DummyExport() {}
 

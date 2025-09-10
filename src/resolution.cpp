@@ -8,6 +8,7 @@
 #include "ztl/zalloc.h"
 #include "ztl/zcoll.h"
 #include "ztl/zcom.h"
+#include "ztl/zstr.h"
 #include "ztl/ztl.h"
 #include "ztl/tsingleton.h"
 #include <windows.h>
@@ -541,6 +542,14 @@ void set_screen_resolution(int nResolution, bool bSave) {
 }
 
 
+static auto CScreenShot__SaveFullScreenToJpg = reinterpret_cast<void(__cdecl*)(HWND hWnd, ZXString<char> sFileName)>(0x00744D77);
+void __cdecl CScreenShot__SaveFullScreenToJpg_hook(HWND hWnd, ZXString<char> sFileName) {
+    DEBUG_MESSAGE("CScreenShot::SaveFullScreenToJpg %s", sFileName);
+    IWzGr2D_DX9Ptr gr = get_gr()->GetInner();
+    gr->TakeScreenShot(static_cast<char*>(sFileName), 0x1); // SFF_JPG
+}
+
+
 class CWzGr2D_DX9 {
 public:
     MEMBER_AT(int, 0x54, m_bWindow)
@@ -631,6 +640,9 @@ void AttachResolutionMod() {
     Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice
     Patch4(0x007E16BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::OnCreate
     Patch4(0x007E1E07 + 2, SCREEN_WIDTH_MAX); // CSlideNotice::SetMsg
+
+    // CScreenShot::SaveFullScreenToJpg
+    ATTACH_HOOK(CScreenShot__SaveFullScreenToJpg, CScreenShot__SaveFullScreenToJpg_hook);
 
     // Gr2D_DX9.dll - reimplement window repositioning function as it does not account for multiple monitors
     CWzGr2D_DX9__RepositionWindow = GetAddressByPattern("GR2D_DX9.DLL", "56 8B F1 8B 86 A8 00 00 00");
