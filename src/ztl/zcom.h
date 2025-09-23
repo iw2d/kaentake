@@ -33,5 +33,5 @@ void __cdecl PcCreateObject(const wchar_t* sUOL, T& pObj, IUnknown* pUnkOuter) {
 }
 
 inline void PcSetRootNameSpace(IUnknown* pNameSpace) {
-    _com_util::CheckError(reinterpret_cast<HRESULT (__cdecl*)(IUnknown**, int32_t)>(_g_ppfnPCOMAPIs[4])(&pNameSpace, 1));
+    _com_util::CheckError(reinterpret_cast<HRESULT (__cdecl*)(IUnknown**, int)>(_g_ppfnPCOMAPIs[4])(&pNameSpace, 1));
 }

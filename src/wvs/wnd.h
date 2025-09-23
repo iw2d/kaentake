@@ -2,8 +2,7 @@
 #include "hook.h"
 #include "wvs/gobj.h"
 #include "wvs/msghandler.h"
-#include "ztl/zalloc.h"
-#include "ztl/zcom.h"
+#include "ztl/ztl.h"
 #include <windows.h>
 
 class CCtrlWnd;

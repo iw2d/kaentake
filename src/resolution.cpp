@@ -5,12 +5,8 @@
 #include "wvs/field.h"
 #include "wvs/rtti.h"
 #include "wvs/util.h"
-#include "ztl/zalloc.h"
-#include "ztl/zcoll.h"
-#include "ztl/zcom.h"
-#include "ztl/zstr.h"
 #include "ztl/ztl.h"
-#include "ztl/tsingleton.h"
+
 #include <windows.h>
 #include <strsafe.h>
 

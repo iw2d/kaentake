@@ -19,6 +19,6 @@ class CField : public CMapLoadable {
 };
 
 
-CField* get_field() {
+inline CField* get_field() {
     return reinterpret_cast<CField*(__cdecl*)()>(0x00437A0C)();
 }

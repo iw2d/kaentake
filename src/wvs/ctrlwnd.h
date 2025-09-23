@@ -3,7 +3,7 @@
 #include "wvs/gobj.h"
 #include "wvs/msghandler.h"
 #include "wvs/wnd.h"
-#include "ztl/zalloc.h"
+#include "ztl/ztl.h"
 #include <windows.h>
 
 

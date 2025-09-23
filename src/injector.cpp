@@ -1,5 +1,5 @@
 #include "hook.h"
-#include "ztl/zalloc.h"
+#include "ztl/ztl.h"
 #include <windows.h>
 
 ZALLOC_GLOBAL

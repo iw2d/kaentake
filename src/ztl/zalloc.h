@@ -1,18 +1,8 @@
 #pragma once
-#include "ztl.h"
 #include "zlock.h"
 
-#define ZALLOC_GLOBAL \
-    void* operator new(size_t uSize) { return ZAllocEx<ZAllocAnonSelector>::s_Alloc(uSize); } \
-    void* operator new[](size_t uSize) { return ZAllocEx<ZAllocAnonSelector>::s_Alloc(uSize); } \
-    void operator delete(void* p) { return ZAllocEx<ZAllocAnonSelector>::s_Free(p); } \
-    void operator delete[](void* p) { return ZAllocEx<ZAllocAnonSelector>::s_Free(p); }
-
-#define ZALLOCEX(T, ADDRESS) \
-    ZAllocEx<T>* ZAllocEx<T>::_s_pAlloc = reinterpret_cast<ZAllocEx<T>*>(ADDRESS);
-
-#define ZRECYCLABLE(T, ADDRESS) \
-    ZRecyclableAvBuffer<ZRefCountedDummy<T>, 0x10, T>*& ZRecyclableAvBuffer<ZRefCountedDummy<T>, 0x10, T>::s_pInstance = *reinterpret_cast<ZRecyclableAvBuffer<ZRefCountedDummy<T>, 0x10, T>**>(ADDRESS);
+template <typename T>
+T* zaddressof(T& t);
 
 
 template <size_t S0, size_t S1, size_t S2, size_t S3>

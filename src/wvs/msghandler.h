@@ -1,5 +1,6 @@
 #pragma once
 #include "wvs/rtti.h"
+#include "wvs/packet.h"
 
 
 class IDraggable;
@@ -34,9 +35,7 @@ public:
 };
 
 
-class CInPacket;
-
 class INetMsgHandler {
 public:
-    virtual void OnPacket(int32_t nType, CInPacket& iPacket) {}
+    virtual void OnPacket(int nType, CInPacket& iPacket) {}
 };

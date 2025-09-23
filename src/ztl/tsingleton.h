@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 
 template <typename T, uintptr_t ADDRESS>
