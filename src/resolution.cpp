@@ -641,6 +641,6 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CScreenShot__SaveFullScreenToJpg, CScreenShot__SaveFullScreenToJpg_hook);
 
     // Gr2D_DX9.dll - reimplement window repositioning function as it does not account for multiple monitors
-    CWzGr2D_DX9__RepositionWindow = GetAddressByPattern("GR2D_DX9.DLL", "56 8B F1 8B 86 A8 00 00 00");
+    CWzGr2D_DX9__RepositionWindow = GetAddressByPattern("Gr2D_DX9.dll", "56 8B F1 8B 86 A8 00 00 00");
     ATTACH_HOOK(CWzGr2D_DX9__RepositionWindow, CWzGr2D_DX9__RepositionWindow_hook);
 }

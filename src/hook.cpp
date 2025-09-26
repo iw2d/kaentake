@@ -95,10 +95,14 @@ void* GetAddress(const char* sModuleName, const char* sProcName) {
     HMODULE hModule = GetModuleHandleA(sModuleName);
     if (!hModule) {
         hModule = LoadLibraryA(sModuleName);
+        if (!hModule) {
+            ErrorMessage("Could not load library %s with error %d", sModuleName, GetLastError());
+            return nullptr;
+        }
     }
     FARPROC result = GetProcAddress(hModule, sProcName);
     if (!result) {
-        DEBUG_MESSAGE("Could not resolve address for %s in module %s", sProcName, sModuleName);
+        ErrorMessage("Could not resolve address for %s in module %s", sProcName, sModuleName);
     }
     return reinterpret_cast<void*>(result);
 }
@@ -107,10 +111,14 @@ void* GetAddressByPattern(const char* sModuleName, const char* sPattern) {
     HMODULE hModule = GetModuleHandleA(sModuleName);
     if (!hModule) {
         hModule = LoadLibraryA(sModuleName);
+        if (!hModule) {
+            ErrorMessage("Could not load library %s with error %d", sModuleName, GetLastError());
+            return nullptr;
+        }
     }
     MODULEINFO mi;
     if (!GetModuleInformation(GetCurrentProcess(), hModule, &mi, sizeof(mi))) {
-        DEBUG_MESSAGE("Could not get module information for : %s", sModuleName);
+        ErrorMessage("Could not get module information for : %s", sModuleName);
         return nullptr;
     }
     unsigned char* pModuleBase = static_cast<unsigned char*>(mi.lpBaseOfDll);
@@ -120,13 +128,13 @@ void* GetAddressByPattern(const char* sModuleName, const char* sPattern) {
     unsigned char abMask[1024];
     size_t uPatternSize = ParsePattern(sPattern, abPattern, abMask);
     if (uPatternSize == 0) {
-        DEBUG_MESSAGE("Could not parse pattern : %s", sPattern);
+        ErrorMessage("Could not parse pattern : %s", sPattern);
         return nullptr;
     }
 
     void* pAddress = FindPattern(pModuleBase, uModuleSize, abPattern, abMask, uPatternSize);
     if (!pAddress) {
-        DEBUG_MESSAGE("Could not resolve address for pattern \"%s\" in module %s", sPattern, sModuleName);
+        ErrorMessage("Could not resolve address for pattern \"%s\" in module %s", sPattern, sModuleName);
     }
     return pAddress;
 }
