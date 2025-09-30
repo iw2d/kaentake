@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "hook.h"
 
 #define WIN32_LEAN_AND_MEAN

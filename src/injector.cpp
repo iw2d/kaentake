@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "hook.h"
 #include "ztl/ztl.h"
 #include <windows.h>

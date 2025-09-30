@@ -1,9 +1,9 @@
 #pragma once
 #include "zlock.h"
+#include <windows.h>
 
 template <typename T>
 T* zaddressof(T& t);
-
 
 template <size_t S0, size_t S1, size_t S2, size_t S3>
 class ZAllocAbstractSelector {
@@ -64,12 +64,46 @@ public:
 
 class ZAllocBase {
 public:
-    static void* _AllocRaw(size_t uSize);
-    static void _FreeRaw(void* p);
-    static void* _AllocRawBlocks(size_t uBlockSize, size_t u);
-    static void _FreeRawBlocks(void* p);
-    static size_t _MemSize(void* p);
-    static void*& _NextHeadBlock(void* p);
+    static void* _AllocRaw(size_t uSize) {
+        HANDLE hHeap = GetProcessHeap();
+        auto pAlloc = static_cast<size_t*>(HeapAlloc(hHeap, 0, uSize + sizeof(size_t)));
+        *pAlloc = uSize;
+        return pAlloc + 1;
+    }
+    static void _FreeRaw(void* p) {
+        HANDLE hHeap = GetProcessHeap();
+        HeapFree(hHeap, 0, static_cast<size_t*>(p) - 1);
+    }
+    static void* _AllocRawBlocks(size_t uBlockSize, size_t u) {
+        size_t uAllocSize = uBlockSize + sizeof(size_t);
+        auto pAlloc = static_cast<size_t*>(_AllocRaw(u * uAllocSize + sizeof(size_t)));
+        *pAlloc++ = 0;
+        *pAlloc = uBlockSize;
+        size_t* pBlock = pAlloc + 1;
+        for (size_t nRemain = u - 1; nRemain > 0; --nRemain) {
+            *pBlock = reinterpret_cast<uintptr_t>(pBlock) + uAllocSize;
+            pBlock = reinterpret_cast<size_t*>(*pBlock);
+            *(pBlock - 1) = uBlockSize;
+        }
+        *pBlock = 0;
+        return pAlloc + 1;
+    }
+    static void _FreeRawBlocks(void* p) {
+        if (!p) {
+            return;
+        }
+        _FreeRaw(static_cast<size_t*>(p) - 2);
+    }
+    static size_t _MemSize(void* p) {
+        size_t uSize = *(static_cast<size_t*>(p) - 1);
+        if (uSize & 0x80000000) {
+            uSize = ~uSize;
+        }
+        return uSize;
+    }
+    static void*& _NextHeadBlock(void* p) {
+        return *reinterpret_cast<void**>(static_cast<size_t*>(p) - 2);
+    }
 };
 
 template <typename T>
@@ -86,21 +120,21 @@ public:
             void* pNext = m_apBlockHead[i];
             while (pNext) {
                 void* pFree = pNext;
-                pNext = _NextHeadBlock(pNext);
-                _FreeRawBlocks(pFree);
+                pNext = ZAllocBase::_NextHeadBlock(pNext);
+                ZAllocBase::_FreeRawBlocks(pFree);
             }
         }
     }
     void* Alloc(size_t uSize) {
         int nIndex = T::SelectBufferIndex(uSize);
         if (nIndex < 0) {
-            return _AllocRaw(uSize);
+            return ZAllocBase::_AllocRaw(uSize);
         }
         int nAllocBlocks;
         size_t uBlockSize = T::GetBlockSize(nIndex, nAllocBlocks);
         ZSynchronizedHelper<ZFatalSection> _sync(m_lock);
         if (!m_apBuff[nIndex]) {
-            void* pBlock = _AllocRawBlocks(uBlockSize, nAllocBlocks);
+            void* pBlock = ZAllocBase::_AllocRawBlocks(uBlockSize, nAllocBlocks);
             *reinterpret_cast<void**>(static_cast<size_t*>(pBlock) - 2) = m_apBlockHead[nIndex];
             m_apBlockHead[nIndex] = pBlock;
             m_apBuff[nIndex] = pBlock;
@@ -115,7 +149,7 @@ public:
         }
         int nIndex = T::SelectBufferIndex(_MemSize(p));
         if (nIndex < 0) {
-            _FreeRaw(p);
+            ZAllocBase::_FreeRaw(p);
             return;
         }
         ZSynchronizedHelper<ZFatalSection> _sync(m_lock);
@@ -240,12 +274,25 @@ public:
 
 class ZRefCountedAccessorBase {
 protected:
-    static ZRefCounted* _Set1(ZRefCounted* p);
-    static void _Delete(ZRefCounted* p);
-    static long _AddRef(ZRefCounted* p);
-    static long _Release(ZRefCounted* p);
-    static ZRefCounted*& _GetPrev(ZRefCounted* p);
-    static ZRefCounted*& _GetNext(ZRefCounted* p);
+    static ZRefCounted* _Set1(ZRefCounted* p) {
+        InterlockedExchange(&p->_m_nRef, 1);
+        return p;
+    }
+    static void _Delete(ZRefCounted* p) {
+        delete p;
+    }
+    static long _AddRef(ZRefCounted* p) {
+        return InterlockedIncrement(&p->_m_nRef);
+    }
+    static long _Release(ZRefCounted* p) {
+        return InterlockedDecrement(&p->_m_nRef);
+    }
+    static ZRefCounted*& _GetPrev(ZRefCounted* p) {
+        return p->_m_pPrev;
+    }
+    static ZRefCounted*& _GetNext(ZRefCounted* p) {
+        return p->_m_pNext;
+    }
 };
 
 template <typename T>

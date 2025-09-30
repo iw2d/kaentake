@@ -6,10 +6,9 @@ add_library(injector SHARED
     resolution.cpp
     debug.cpp
     hook.cpp
-
-    ztl/zlock.cpp
-    ztl/zalloc.cpp
 )
+
+target_precompile_headers(injector PRIVATE pch.h)
 
 target_link_libraries(injector PRIVATE
     Detours

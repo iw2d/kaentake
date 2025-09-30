@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "hook.h"
 #include "debug.h"
 #include <windows.h>

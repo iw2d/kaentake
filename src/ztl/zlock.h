@@ -1,27 +1,61 @@
 #pragma once
-
-
-struct _TEB;
-
+#include <windows.h>
 
 class ZFatalSectionData {
 public:
     void* _m_pTIB = nullptr;
     volatile long _m_nRef = 0;
 };
+
 static_assert(sizeof(ZFatalSectionData) == 0x8);
 
 
 class ZFatalSection : public ZFatalSectionData {
 private:
-    static struct _TEB*(__fastcall* _s_pfnTry)(volatile long*);
-    static struct _TEB* __fastcall _TryM(volatile long* __formal);
-    static struct _TEB* __fastcall _TryS(volatile long* __formal);
-    static struct _TEB* __fastcall _TryI(volatile long* p);
+    typedef struct _TEB*(__fastcall* pfnTry_t)(volatile long*);
+    static pfnTry_t _s_pfnTry;
+
+    static struct _TEB* __fastcall _TryM(volatile long* __formal) {
+        _TEB* pTeb = NtCurrentTeb();
+        long result = InterlockedCompareExchange(__formal, reinterpret_cast<long>(pTeb), 0);
+        if (result) {
+            if (result == reinterpret_cast<long>(pTeb)) {
+                InterlockedIncrement(__formal + 1);
+                return nullptr;
+            }
+        } else {
+            InterlockedExchange(__formal + 1, 1);
+        }
+        return reinterpret_cast<_TEB*>(result);
+    }
+    static struct _TEB* __fastcall _TryS(volatile long* __formal) {
+        _TEB* pTeb = NtCurrentTeb();
+        long result = InterlockedCompareExchange(__formal, reinterpret_cast<long>(pTeb), 0);
+        InterlockedExchange(__formal + 1, 1);
+        return reinterpret_cast<_TEB*>(result);
+    }
+    static struct _TEB* __fastcall _TryI(volatile long* p) {
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        pfnTry_t pfnTry = _TryM;
+        if (si.dwNumberOfProcessors <= 1) {
+            pfnTry = _TryS;
+        }
+        _s_pfnTry = pfnTry;
+        return pfnTry(p);
+    }
 
 public:
-    void Lock();
+    void Lock() {
+        volatile long* p = reinterpret_cast<volatile long*>(this);
+        if (ZFatalSection::_s_pfnTry(p) && ZFatalSection::_s_pfnTry(p)) {
+            do {
+                Sleep(0);
+            } while (ZFatalSection::_s_pfnTry(p));
+        }
+    }
 };
+inline ZFatalSection::pfnTry_t ZFatalSection::_s_pfnTry = ZFatalSection::_TryI;
 static_assert(sizeof(ZFatalSection) == 0x8);
 
 

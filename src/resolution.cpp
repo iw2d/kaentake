@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "hook.h"
 #include "wvs/wnd.h"
 #include "wvs/ctrlwnd.h"

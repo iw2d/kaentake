@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "hook.h"
 #include "wvs/stage.h"
 #include "wvs/packet.h"
@@ -8,6 +9,7 @@
 #include <comdef.h>
 
 #pragma comment(lib, "winmm.lib")
+#pragma warning(disable : 4996)
 
 
 class ZInetAddr : public sockaddr_in {
