@@ -10,6 +10,9 @@
 #include <ws2spi.h>
 #include <ws2tcpip.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
+#include <vector>
+#include <tuple>
 #include <new>

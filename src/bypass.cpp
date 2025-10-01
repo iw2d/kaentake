@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "hook.h"
+#include "wvs/wvsapp.h"
 #include "wvs/stage.h"
 #include "wvs/packet.h"
 #include "wvs/util.h"
@@ -93,33 +94,7 @@ struct ISMSG {
 class CInputSystem : public TSingleton<CInputSystem, 0x00BEC33C> {
 };
 
-
 class CConfig : public TSingleton<CConfig, 0x00BEBF9C> {
-};
-
-class CWvsApp : public TSingleton<CWvsApp, 0x00BE7B38> {
-public:
-    MEMBER_AT(HWND, 0x4, m_hWnd)
-    MEMBER_AT(int, 0x8, m_bPCOMInitialized)
-    MEMBER_AT(unsigned int, 0xC, m_dwMainThreadId)
-    MEMBER_AT(HHOOK, 0x10, m_hHook)
-    MEMBER_AT(int, 0x14, m_bWin9x)
-    MEMBER_AT(int, 0x18, m_tUpdateTime)
-    MEMBER_AT(int, 0x1C, m_bFirstUpdate)
-    MEMBER_AT(ZXString<char>, 0x20, m_sCmdLine)
-    MEMBER_AT(int, 0x24, m_nGameStartMode)
-    MEMBER_AT(int, 0x28, m_bAutoConnect)
-    MEMBER_AT(int, 0x2C, m_bShowAdBalloon)
-    MEMBER_AT(int, 0x30, m_bExitByTitleEscape)
-    MEMBER_AT(HRESULT, 0x34, m_hrZExceptionCode)
-    MEMBER_AT(HRESULT, 0x38, m_hrComErrorCode)
-    MEMBER_AT(int, 0x54, m_nTargetVersion)
-    MEMBER_ARRAY_AT(void*, 0x54, m_ahInput, 3)
-
-    MEMBER_HOOK(void, 0x009F4FDA, Constructor)
-    MEMBER_HOOK(void, 0x009F5239, SetUp)
-    MEMBER_HOOK(void, 0x009F84D0, CallUpdate, int tCurTime)
-    MEMBER_HOOK(void, 0x009F5C50, Run, int* pbTerminate)
 };
 
 void CWvsApp::Constructor_hook() {
@@ -143,7 +118,6 @@ void CWvsApp::Constructor_hook() {
 
     OSVERSIONINFOA ovi;
     ovi.dwOSVersionInfoSize = 148;
-#pragma warning(suppress : 4996)
     GetVersionExA(&ovi);
     m_bWin9x = ovi.dwPlatformId == 1;
     if (ovi.dwMajorVersion >= 6 && !m_nGameStartMode) {

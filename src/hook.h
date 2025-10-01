@@ -45,10 +45,12 @@ void AttachSystemHooks();
 
 // called in system.cpp -> CreateMutexA_hook
 void AttachClientBypass();
+void AttachResManMod();
 void AttachResolutionMod();
 
 inline void AttachClientHooks() {
     AttachClientBypass();
+    AttachResManMod();
     AttachResolutionMod();
 }
 
