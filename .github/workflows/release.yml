@@ -1,0 +1,26 @@
+name: release
+
+on:
+  push:
+    tags:
+    - '*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: configure
+      run: cmake --preset release-win32
+    - name: build
+      run: cmake --build --preset release-win32
+    - name: release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "build/Release/*.dll,build/Release/*.exe"
+        allowUpdates: true

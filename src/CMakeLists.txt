@@ -22,9 +22,13 @@ set_target_properties(injector PROPERTIES
 
 # Build launcher
 add_executable(launcher WIN32
+    launcher.manifest
+    launcher.rc
     launcher.cpp
     debug.cpp
 )
+
+target_link_options(launcher PRIVATE "/MANIFEST:NO")
 
 target_link_libraries(launcher PRIVATE
     Detours
