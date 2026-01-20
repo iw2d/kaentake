@@ -12,7 +12,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     const char* sApplicationName = lpCmdLine && *lpCmdLine ? lpCmdLine : "MapleStory.exe";
     if (!DetourCreateProcessWithDllExA(sApplicationName, lpCmdLine, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi, "kaentake.dll", NULL)) {
-        ErrorMessage("Could not start %s [%d]", sApplicationName, GetLastError());
+        DWORD dwError = GetLastError();
+        LPSTR sErrorMessage = nullptr;
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, dwError, 0, (LPSTR)&sErrorMessage, 0, nullptr);
+        ErrorMessage("Could not start %s [%d]\n%s", sApplicationName, dwError, sErrorMessage);
+        LocalFree(sErrorMessage);
         return 1;
     }
     ResumeThread(pi.hThread);
