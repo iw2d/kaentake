@@ -350,6 +350,10 @@ void __fastcall CWnd__CreateWnd_hook(CWnd* pThis, void* _EDX, int l, int t, int 
     CWnd__CreateWnd(pThis, l, t - get_adjust_cy(), w, h, z, bScreenCoord, pData, bSetFocus);
 }
 
+void __fastcall CDialog__CreateDlg_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
+    CWnd__CreateWnd(pThis, l, t - get_adjust_cy(), w, h, z, bScreenCoord, pData, 1);
+}
+
 
 class CUtilDlgEx : public CWnd {
 public:
@@ -631,6 +635,9 @@ void AttachResolutionMod() {
     // CWnd::CreateWnd - reposition dialogs
     PatchCall(0x004EDAE6, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, int, int, int, void*)
     PatchCall(0x004EDB95, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
+
+    // CWorldMapDlg::CreateWorldMapDlg - adjust world map dialog y position
+    PatchCall(0x009EB5A3, &CDialog__CreateDlg_hook);
 
     // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
     ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);
