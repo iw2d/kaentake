@@ -22,5 +22,5 @@ jobs:
     - name: release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "build/Release/*.dll,build/Release/*.exe"
+        artifacts: "build/Release/*.wz,build/Release/*.dll,build/Release/*.exe"
         allowUpdates: true

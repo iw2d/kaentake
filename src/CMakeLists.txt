@@ -20,6 +20,12 @@ set_target_properties(injector PROPERTIES
     OUTPUT_NAME ${PROJECT_NAME}
 )
 
+add_custom_command(TARGET injector POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/Custom.wz"
+        "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+)
+
 
 # Build launcher
 add_executable(launcher WIN32
