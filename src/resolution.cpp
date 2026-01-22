@@ -195,7 +195,7 @@ void CUISysOpt::OnCreate_hook(void* pData) {
     paramComboBox.nBorderColor = 0xFF999999;
 
     g_cbResolution = new CCtrlComboBox();
-    g_cbResolution->CreateCtrl(this, 2000, 0, 67, 278, 175, 18, &paramComboBox);
+    g_cbResolution->CreateCtrl(this, 2000, 0, 76, 338, 166, 18, &paramComboBox);
     const char* asResolution[] = {
             "800 x 600",
             "1024 x 768",
@@ -603,8 +603,8 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CConfig::ApplySysOpt, CConfig::ApplySysOpt_hook);
     ATTACH_HOOK(CUISysOpt::OnCreate, CUISysOpt::OnCreate_hook);
     ATTACH_HOOK(CUISysOpt::Destructor, CUISysOpt::Destructor_hook);
-    // CUISysOpt::OnCreate - hide monster info combo box
-    Patch4(0x00994525 + 1, 0);
+    // CUISysOpt::OnCreate - shift ok/cancel buttons
+    Patch4(0x009945BC + 1, 372);
 
     ATTACH_HOOK(CInputSystem::SetCursorVectorPos, CInputSystem::SetCursorVectorPos_hook);
     ATTACH_HOOK(CInputSystem::SetCursorPos, CInputSystem::SetCursorPos_hook);

@@ -3,6 +3,7 @@ add_library(injector SHARED
     injector.cpp
     system.cpp
     bypass.cpp
+    resman.cpp
     resolution.cpp
     debug.cpp
     hook.cpp
@@ -17,6 +18,12 @@ target_link_libraries(injector PRIVATE
 
 set_target_properties(injector PROPERTIES
     OUTPUT_NAME ${PROJECT_NAME}
+)
+
+add_custom_command(TARGET injector POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/Custom.wz"
+        "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
 )
 
 
