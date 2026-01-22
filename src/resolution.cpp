@@ -354,6 +354,10 @@ void __fastcall CDialog__CreateDlg_hook(CWnd* pThis, void* _EDX, int l, int t, i
     CWnd__CreateWnd(pThis, l, t - get_adjust_cy(), w, h, z, bScreenCoord, pData, 1);
 }
 
+void __fastcall CWnd__CreateWnd_CClock_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
+    CWnd__CreateWnd(pThis, l, t + get_adjust_dy(), w, h, z, bScreenCoord, pData, bSetFocus);
+}
+
 
 class CUtilDlgEx : public CWnd {
 public:
@@ -486,7 +490,14 @@ IWzGr2DLayerPtr* __fastcall CField__ShowMobHPTag_hook2(IWzGr2D* pThis, void* _ED
 class CWvsContext : public TSingleton<CWvsContext, 0x00BE7918> {
 public:
     MEMBER_AT(CTemporaryStatView, 0x2EA8, m_temporaryStatView)
+    MEMBER_AT(ZRef<CWnd>, 0x36C8, m_pClock) // ZRef<CClock>
 };
+
+void set_clock_position(CWnd* pClock) {
+    if (pClock && pClock->m_bScreenCoord) {
+        pClock->MoveWnd(pClock->GetAbsLeft(), 30 + get_adjust_dy());
+    }
+}
 
 void set_screen_resolution(int nResolution, bool bSave) {
     int nScreenWidth = 800;
@@ -551,6 +562,9 @@ void set_screen_resolution(int nResolution, bool bSave) {
                 // CMapLoadable::OnEventChangeScreenResolution
                 field->RestoreViewRange_hook();
                 field->ReloadBack();
+                // Reposition clocks
+                set_clock_position(field->m_pClock);
+                set_clock_position(CWvsContext::GetInstance()->m_pClock);
             }
         }
     }
@@ -635,9 +649,16 @@ void AttachResolutionMod() {
     // CWnd::CreateWnd - reposition dialogs
     PatchCall(0x004EDAE6, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, int, int, int, void*)
     PatchCall(0x004EDB95, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
-
     // CWorldMapDlg::CreateWorldMapDlg - adjust world map dialog y position
     PatchCall(0x009EB5A3, &CDialog__CreateDlg_hook);
+
+    // CWnd::CreateWnd - reposition CClock
+    PatchCall(0x005362B7, CWnd__CreateWnd_CClock_hook); // CField::OnClock(CField*, int)
+    PatchCall(0x00536386, CWnd__CreateWnd_CClock_hook); // CField::OnClock(CField*, int)
+    PatchCall(0x00545D1F, CWnd__CreateWnd_CClock_hook); // CField_Battlefield::OnClock(CField*, int)
+    PatchCall(0x00560429, CWnd__CreateWnd_CClock_hook); // CField_Massacre::OnClock(CField*, int)
+    PatchCall(0x00578B2B, CWnd__CreateWnd_CClock_hook); // CField_SpaceGAGA::OnClock(CField*, int)
+    PatchCall(0x00A24D10, CWnd__CreateWnd_CClock_hook); // CWvsContext::SetEventTimer(CWvsContext*, int)
 
     // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
     ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);

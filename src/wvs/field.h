@@ -1,6 +1,8 @@
 #pragma once
 #include "hook.h"
 #include "wvs/stage.h"
+#include "wvs/wnd.h"
+#include "ztl/ztl.h"
 
 
 class CMapLoadable : public CStage {
@@ -16,6 +18,8 @@ public:
 
 
 class CField : public CMapLoadable {
+public:
+    MEMBER_AT(ZRef<CWnd>, 0x1C8, m_pClock) // ZRef<CClock>
 };
 
 

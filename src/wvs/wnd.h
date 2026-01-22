@@ -14,6 +14,7 @@ public:
     MEMBER_AT(IWzGr2DLayerPtr, 0x20, m_pOverlabLayer)
     MEMBER_AT(int, 0x24, m_width)
     MEMBER_AT(int, 0x28, m_height)
+    MEMBER_AT(int, 0x3C, m_bScreenCoord)
 
     virtual void Update() override {}
     virtual int OnDragDrop(int nState, DRAGCTX& ctx, int rx, int ry) { return 0; }
