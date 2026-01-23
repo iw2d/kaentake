@@ -10,7 +10,9 @@
 
 #include <windows.h>
 #include <strsafe.h>
+#include <intrin.h>
 
+#define STATUS_BAR_ORIGIN CWnd::UIOrigin::Origin_CB
 #define SCREEN_WIDTH_MAX  1920
 #define SCREEN_HEIGHT_MAX 1080
 
@@ -20,6 +22,8 @@ static int g_nResolution = 0;
 static int g_nScreenWidth = 800;
 static int g_nScreenHeight = 600;
 static int g_nAdjustCenterY = 0;
+
+void set_screen_resolution(int nResolution, bool bSave);
 
 int get_screen_width() {
     return g_nScreenWidth;
@@ -31,13 +35,6 @@ int get_screen_height() {
 
 int get_adjust_cy() {
     return g_nAdjustCenterY;
-}
-
-int get_adjust_dx() {
-    return -(g_nScreenWidth - 800) / 2;
-}
-int get_adjust_dy() {
-    return -(g_nScreenHeight - 600) / 2 - g_nAdjustCenterY;
 }
 
 void get_default_position(int nUIType, int* pnDefaultX, int* pnDefaultY) {
@@ -98,14 +95,12 @@ void get_default_position(int nUIType, int* pnDefaultX, int* pnDefaultY) {
         break;
     }
     if (pnDefaultX) {
-        *pnDefaultX = nDefaultX + get_adjust_dx();
+        *pnDefaultX = nDefaultX;
     }
     if (pnDefaultY) {
-        *pnDefaultY = nDefaultY + get_adjust_dy();
+        *pnDefaultY = nDefaultY;
     }
 }
-
-void set_screen_resolution(int nResolution, bool bSave);
 
 
 static auto set_stage = reinterpret_cast<void(__cdecl*)(CStage*, void*)>(0x00777347);
@@ -134,6 +129,7 @@ public:
     MEMBER_ARRAY_AT(int, 0xCC, m_nUIWnd_X, 34)
     MEMBER_ARRAY_AT(int, 0x154, m_nUIWnd_Y, 34)
 
+    MEMBER_HOOK(void, 0x0049F0B5, GetUIWndPos, int nUIType, int* x, int* y, int* op)
     MEMBER_HOOK(void, 0x0049D0B6, LoadCharacter, int nWorldID, unsigned int dwCharacterId)
     MEMBER_HOOK(void, 0x0049C441, LoadGlobal)
     MEMBER_HOOK(void, 0x0049C8E7, SaveGlobal)
@@ -147,6 +143,13 @@ public:
     }
 };
 
+void CConfig::GetUIWndPos_hook(int nUIType, int* x, int* y, int* op) {
+    CConfig::GetUIWndPos(this, nUIType, x, y, op);
+    if (*x < -5 || *x > get_screen_width() - 6 || *y < -5 || *y > get_screen_height() -6) {
+        get_default_position(nUIType, x, y);
+    }
+}
+
 void CConfig::LoadCharacter_hook(int nWorldID, unsigned int dwCharacterId) {
     CConfig::LoadCharacter(this, nWorldID, dwCharacterId);
     for (size_t i = 0; i < 34; ++i) {
@@ -156,9 +159,9 @@ void CConfig::LoadCharacter_hook(int nWorldID, unsigned int dwCharacterId) {
 
         char sBuffer[1024];
         sprintf_s(sBuffer, 1024, "uiWndX%d", i);
-        m_nUIWnd_X[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultX, get_adjust_dx() - 5, get_screen_width() + get_adjust_dx() - 6);
+        m_nUIWnd_X[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultX, -5, get_screen_width() - 6);
         sprintf_s(sBuffer, 1024, "uiWndY%d", i);
-        m_nUIWnd_Y[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultY, get_adjust_dy() - 5, get_screen_height() + get_adjust_dy() - 6);
+        m_nUIWnd_Y[i] = GetOpt_Int(GLOBAL_OPT, sBuffer, nDefaultY, -5, get_screen_height() - 6);
     }
 }
 
@@ -244,32 +247,188 @@ int CInputSystem::SetCursorPos_hook(int x, int y) {
 class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
 public:
     inline static ZList<CWnd*>& ms_lpWindow = *reinterpret_cast<ZList<CWnd*>*>(0x00BF1648);
+    inline static IWzVector2DPtr ms_pOrgWindowEx[9];
 
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
-    MEMBER_HOOK(void, 0x009E311B, GetCursorPos, POINT* lpPoint, int bField)
-    MEMBER_HOOK(IUIMsgHandler*, 0x009E42B2, GetHandlerFromPoint, int x, int y)
-};
+    MEMBER_HOOK(void, 0x009E2C42, Constructor, HWND hWnd)
+    MEMBER_HOOK(void, 0x009E3026, Destructor)
+    MEMBER_HOOK(IWzVector2DPtr*, 0x0048BBA5, GetOrgWindow, IWzVector2DPtr* result)
 
-void CWndMan::GetCursorPos_hook(POINT* lpPoint, int bField) {
-    if (CInputSystem::IsInstantiated()) {
-        CInputSystem::GetInstance()->GetCursorPos(lpPoint);
-        lpPoint->x += get_adjust_dx();
-        lpPoint->y += get_adjust_dy();
-        if (bField) {
-            lpPoint->x += m_pOrgWindow->x;
-            lpPoint->y += m_pOrgWindow->y;
+    IWzVector2DPtr& GetOrgWindowEx(CWnd::UIOrigin org) {
+        return ms_pOrgWindowEx[org];
+    }
+    void ResetOrgWindow() {
+        auto pOrgWindow = CWndMan::GetInstance()->m_pOrgWindow;
+        pOrgWindow->origin = static_cast<IUnknown*>(get_gr()->center);
+        pOrgWindow->RelMove(-(get_screen_width() / 2), -(get_screen_height() / 2) - get_adjust_cy());
+        for (int i = 0; i < CWnd::UIOrigin::Origin_NUM; ++i) {
+            int nX = -(get_screen_width() / 2);
+            if (i % 3 == 1) {
+                nX += (get_screen_width() - 800) / 2;
+            } else if (i % 3 == 2) {
+                nX += (get_screen_width() - 800);
+            }
+            int nY = -(get_screen_height() / 2) - get_adjust_cy();
+            if (i / 3 == 1) {
+                nY += (get_screen_height() - 600) / 2;
+            } else if (i / 3 == 2) {
+                nY += (get_screen_height() - 600);
+            }
+            ms_pOrgWindowEx[i]->origin = static_cast<IUnknown*>(get_gr()->center);
+            ms_pOrgWindowEx[i]->RelMove(nX, nY);
         }
     }
-}
+};
 
-IUIMsgHandler* CWndMan::GetHandlerFromPoint_hook(int x, int y) {
-    IUIMsgHandler* pHandler = CWndMan::GetHandlerFromPoint(this, x, y);
-    if (!pHandler && x >= get_adjust_dx() && x < get_screen_width() + get_adjust_dx() && y >= get_adjust_dy() && y < get_screen_height() + get_adjust_dy()) {
-        return CWndMan::GetInstance();
+void CWndMan::Constructor_hook(HWND hWnd) {
+    CWndMan::Constructor(this, hWnd);
+    for (int i = 0; i < CWnd::UIOrigin::Origin_NUM; ++i) {
+        PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgWindowEx[i], nullptr);
     }
-    return pHandler;
+    ResetOrgWindow();
 }
 
+void CWndMan::Destructor_hook() {
+    CWndMan::Destructor(this);
+    for (int i = 0; i < CWnd::UIOrigin::Origin_NUM; ++i) {
+        ms_pOrgWindowEx[i] = nullptr;
+    }
+}
+
+
+IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
+    auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
+    switch (ret) {
+    case 0x00533B77: // CField::ShowMobHPTag
+    case 0x0058C91C: // CFloatNotice::CreateFloatNotice
+    case 0x006CD787: // CNoticeQuestProgress::CNoticeQuestProgress
+        result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CT);
+        break;
+    default:
+        if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
+            result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
+        } else {
+            result->GetInterfacePtr() = m_pOrgWindow;
+        }
+        break;
+    }
+    result->AddRef();
+    return result;
+}
+
+void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
+    auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
+    // CDialog::CreateDlg(CDialog*, int, int, int, void*) || CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
+    if (ret == 0x004EDAEB || ret == 0x004EDB9A) {
+        l = (get_screen_width() - w) / 2;
+        t = (get_screen_height() - h) / 2;
+    }
+    CWnd::CreateWnd(this, l, t, w, h, z, bScreenCoord, pData, bSetFocus);
+    if (!bScreenCoord) {
+        return;
+    }
+    switch (ret) {
+    case 0x005362BC: // CField::OnClock(CField*, int)
+    case 0x0053638B: // CField::OnClock(CField*, int)
+    case 0x00545D24: // CField_Battlefield::OnClock(CField*, int)
+    case 0x0056042E: // CField_Massacre::OnClock(CField*, int)
+    case 0x00578B30: // CField_SpaceGAGA::OnClock(CField*, int)
+    case 0x00A24D15: // CWvsContext::SetEventTimer(CWvsContext*, int)
+        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(CWnd::UIOrigin::Origin_CT));
+        return;
+    case 0x0045A5EF: // CAvatarMegaphone::CAvatarMegaphone
+        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(CWnd::UIOrigin::Origin_RT));
+        return;
+    case 0x0051FA03: // CFadeWnd::CreateFadeWnd
+    case 0x008CFD65: // CUIStatusBar::CUIStatusBar
+        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(STATUS_BAR_ORIGIN));
+        return;
+    }
+}
+
+
+void __fastcall CDialog__CreateDlg_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
+    CWnd::CreateWnd(pThis, l + (get_screen_width() - 800) / 2, t + (get_screen_height() - 600) / 2, w, h, z, bScreenCoord, pData, 1);
+}
+
+
+class CUtilDlgEx : public CWnd {
+public:
+    MEMBER_AT(int, 0x98, m_wndWidth)
+    MEMBER_AT(int, 0x9C, m_wndHeight)
+    MEMBER_HOOK(void, 0x009A3E38, CreateUtilDlgEx)
+};
+
+static RECT& sRectQuestDlg = *reinterpret_cast<RECT*>(0x00BE2DF0);
+
+void CUtilDlgEx::CreateUtilDlgEx_hook() {
+    int nLeft = zclamp<int>(sRectQuestDlg.left - m_wndWidth / 2, 0, get_screen_width());
+    int nTop = zclamp<int>(sRectQuestDlg.top - m_wndHeight / 2, 0, get_screen_height());
+    // CDialog::CreateDlg(this, nLeft, nTop, m_wndWidth, m_wndHeight, 10, 1, 0);
+    CWnd::CreateWnd(this, nLeft, nTop, m_wndWidth, m_wndHeight, 10, 1, nullptr, 1);
+}
+
+
+class CUIToolTip {
+public:
+    MEMBER_AT(int, 0x8, m_nHeight)
+    MEMBER_AT(int, 0xC, m_nWidth)
+    MEMBER_AT(IWzGr2DLayerPtr, 0x10, m_pLayer)
+    MEMBER_HOOK(IWzCanvasPtr*, 0x008F3141, MakeLayer, IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor)
+};
+
+IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor) {
+    CUIToolTip::MakeLayer(this, result, nLeft, nTop, bDoubleOutline, bLogin, bCharToolTip, uColor);
+    if (!bCharToolTip) {
+        if (nLeft < 0) {
+            nLeft = 0;
+        }
+        if (nTop < 0) {
+            nTop = 0;
+        }
+        int nBoundX = get_screen_width() - 1;
+        if (nLeft + m_nWidth > nBoundX) {
+            nLeft = nBoundX - m_nWidth;
+        }
+        int nBoundY = get_screen_height() - 1;
+        if (nTop + m_nHeight > nBoundY) {
+            nTop = nBoundY - m_nHeight;
+        }
+        m_pLayer->RelMove(nLeft, nTop);
+    }
+    return result;
+}
+
+
+class CTemporaryStatView {
+public:
+    struct TEMPORARY_STAT : public ZRefCounted {
+        unsigned char pad0[0x40 - sizeof(ZRefCounted)];
+        MEMBER_AT(int, 0x1C, nType)
+        MEMBER_AT(IWzGr2DLayerPtr, 0x28, pLayer)
+        MEMBER_AT(IWzGr2DLayerPtr, 0x2C, pLayerShadow)
+    };
+    MEMBER_AT(ZList<ZRef<TEMPORARY_STAT>>, 0x4, m_lTemporaryStat)
+    MEMBER_HOOK(void, 0x007B2BB0, AdjustPosition)
+};
+
+void CTemporaryStatView::AdjustPosition_hook() {
+    int nOffsetX = (get_screen_width() / 2) - 3 + (-32 * m_lTemporaryStat.GetCount());
+    int nOffsetY = (get_screen_height() / 2) + get_adjust_cy() - 23;
+    auto pos = m_lTemporaryStat.GetHeadPosition();
+    while (pos) {
+        auto pNext = m_lTemporaryStat.GetNext(pos);
+        pNext->pLayer->RelMove((32 - pNext->pLayer->width) / 2 + nOffsetX, (32 - pNext->pLayer->height) / 2 - nOffsetY);
+        pNext->pLayerShadow->RelMove((32 - pNext->pLayerShadow->width) / 2 + nOffsetX, (32 - pNext->pLayerShadow->height) / 2 - nOffsetY);
+        nOffsetX += 32;
+    }
+}
+
+
+class CWvsContext : public TSingleton<CWvsContext, 0x00BE7918> {
+public:
+    MEMBER_AT(CTemporaryStatView, 0x2EA8, m_temporaryStatView)
+};
 
 class CWvsPhysicalSpace2D : public TSingleton<CWvsPhysicalSpace2D, 0x00BEBFA0> {
 public:
@@ -308,6 +467,13 @@ void __declspec(naked) CMapLoadable__MakeGrid_hook() {
     }
 }
 
+HRESULT __stdcall CMapLoadable__raw_WrapClip_hook(IWzVector2D* pThis, VARIANT pOrigin, int nWrapLeft, int nWrapTop, unsigned int uWrapWidth, unsigned int uWrapHeight, VARIANT bClip) {
+    nWrapLeft = nWrapLeft + 400 - (SCREEN_WIDTH_MAX / 2);
+    nWrapTop = nWrapTop + 300 - (SCREEN_HEIGHT_MAX / 2) - ((SCREEN_HEIGHT_MAX - 600) / 2);
+    uWrapWidth = uWrapWidth - 800 + SCREEN_WIDTH_MAX;
+    uWrapHeight = uWrapHeight - 600 + SCREEN_HEIGHT_MAX;
+    return pThis->raw_WrapClip(pOrigin, nWrapLeft, nWrapTop, uWrapWidth, uWrapHeight, bClip);
+}
 
 HRESULT __stdcall CField_LimitedView__raw_Copy_hook(IWzCanvas* pThis, int nDstLeft, int nDstTop, IWzCanvas* pSource, VARIANT nAlpha) {
     nDstLeft = nDstLeft + (SCREEN_WIDTH_MAX / 2) - 400;
@@ -327,146 +493,22 @@ void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
     CWnd__OnMoveWnd(pThis, l, t);
     int nAbsLeft = pThis->GetAbsLeft();
     int nAbsTop = pThis->GetAbsTop();
-    if (abs(nAbsLeft - get_adjust_dx()) <= 10) {
-        pThis->m_pLayer->lt->RelMove(get_adjust_dx(), nAbsTop);
+    if (abs(nAbsLeft) <= 10) {
+        pThis->m_pLayer->lt->RelMove(0, nAbsTop);
     }
-    if (abs(nAbsTop - get_adjust_dy()) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nAbsLeft, get_adjust_dy());
+    if (abs(nAbsTop) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nAbsLeft, 0);
     }
     int nWidth = pThis->m_pLayer->width;
-    int nBoundX = get_screen_width() + get_adjust_dx();
+    int nBoundX = get_screen_width();
     if (abs(nAbsLeft + nWidth - nBoundX) <= 10) {
         pThis->m_pLayer->lt->RelMove(nBoundX - nWidth, nAbsTop);
     }
     int nHeight = pThis->m_pLayer->height;
-    int nBoundY = get_screen_height() + get_adjust_dy();
+    int nBoundY = get_screen_height();
     if (abs(nAbsTop + nHeight - nBoundY) <= 10) {
         pThis->m_pLayer->lt->RelMove(nAbsLeft, nBoundY - nHeight);
     }
-}
-
-static auto CWnd__CreateWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int, int, int, int, int, void*, int)>(0x009DE4D2);
-void __fastcall CWnd__CreateWnd_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
-    CWnd__CreateWnd(pThis, l, t - get_adjust_cy(), w, h, z, bScreenCoord, pData, bSetFocus);
-}
-
-void __fastcall CDialog__CreateDlg_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
-    CWnd__CreateWnd(pThis, l, t - get_adjust_cy(), w, h, z, bScreenCoord, pData, 1);
-}
-
-void __fastcall CWnd__CreateWnd_CClock_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
-    CWnd__CreateWnd(pThis, l, t + get_adjust_dy(), w, h, z, bScreenCoord, pData, bSetFocus);
-}
-
-
-class CUtilDlgEx : public CWnd {
-public:
-    MEMBER_AT(int, 0x98, m_wndWidth)
-    MEMBER_AT(int, 0x9C, m_wndHeight)
-    MEMBER_HOOK(void, 0x009A3E38, CreateUtilDlgEx)
-};
-
-static RECT& sRectQuestDlg = *reinterpret_cast<RECT*>(0x00BE2DF0);
-
-void CUtilDlgEx::CreateUtilDlgEx_hook() {
-    int nLeft = zclamp<int>(sRectQuestDlg.left - m_wndWidth / 2, get_adjust_dx(), get_screen_width() + get_adjust_dx());
-    int nTop = zclamp<int>(sRectQuestDlg.top - m_wndHeight / 2, get_adjust_dy(), get_screen_height() + get_adjust_dy());
-    // CDialog::CreateDlg(this, nLeft, nTop, m_wndWidth, m_wndHeight, 10, 1, 0);
-    CWnd__CreateWnd(this, nLeft, nTop, m_wndWidth, m_wndHeight, 10, 1, nullptr, 1);
-}
-
-
-class CUIToolTip {
-public:
-    MEMBER_AT(int, 0x8, m_nHeight)
-    MEMBER_AT(int, 0xC, m_nWidth)
-    MEMBER_AT(IWzGr2DLayerPtr, 0x10, m_pLayer)
-    MEMBER_HOOK(IWzCanvasPtr*, 0x008F3141, MakeLayer, IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor)
-};
-
-IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor) {
-    CUIToolTip::MakeLayer(this, result, nLeft, nTop, bDoubleOutline, bLogin, bCharToolTip, uColor);
-    if (!bCharToolTip) {
-        if (nLeft < get_adjust_dx()) {
-            nLeft = get_adjust_dx();
-        }
-        if (nTop < get_adjust_dy()) {
-            nTop = get_adjust_dy();
-        }
-        int nBoundX = get_screen_width() + get_adjust_dx() - 1;
-        if (nLeft + m_nWidth > nBoundX) {
-            nLeft = nBoundX - m_nWidth;
-        }
-        int nBoundY = get_screen_height() + get_adjust_dy() - 1;
-        if (nTop + m_nHeight > nBoundY) {
-            nTop = nBoundY - m_nHeight;
-        }
-        m_pLayer->RelMove(nLeft, nTop);
-    }
-    return result;
-}
-
-
-class CTemporaryStatView {
-public:
-    struct TEMPORARY_STAT : public ZRefCounted {
-        unsigned char pad0[0x40 - sizeof(ZRefCounted)];
-        MEMBER_AT(int, 0x1C, nType)
-        MEMBER_AT(IWzGr2DLayerPtr, 0x28, pLayer)
-        MEMBER_AT(IWzGr2DLayerPtr, 0x2C, pLayerShadow)
-    };
-    MEMBER_AT(ZList<ZRef<TEMPORARY_STAT>>, 0x4, m_lTemporaryStat)
-    MEMBER_HOOK(void, 0x007B2BB0, AdjustPosition)
-    MEMBER_HOOK(int, 0x007B2E58, ShowToolTip, CUIToolTip& uiToolTip, POINT* ptCursor, int rx, int ry)
-    MEMBER_HOOK(void, 0x007B3055, FindIcon, POINT* ptCursor, int& nType, int& nID)
-};
-
-void CTemporaryStatView::AdjustPosition_hook() {
-    int nOffsetX = (get_screen_width() / 2) - 3 + (-32 * m_lTemporaryStat.GetCount());
-    int nOffsetY = (get_screen_height() / 2) + get_adjust_cy() - 23;
-    auto pos = m_lTemporaryStat.GetHeadPosition();
-    while (pos) {
-        auto pNext = m_lTemporaryStat.GetNext(pos);
-        pNext->pLayer->RelMove((32 - pNext->pLayer->width) / 2 + nOffsetX, (32 - pNext->pLayer->height) / 2 - nOffsetY);
-        pNext->pLayerShadow->RelMove((32 - pNext->pLayerShadow->width) / 2 + nOffsetX, (32 - pNext->pLayerShadow->height) / 2 - nOffsetY);
-        nOffsetX += 32;
-    }
-}
-
-int CTemporaryStatView::ShowToolTip_hook(CUIToolTip& uiToolTip, POINT* ptCursor, int rx, int ry) {
-    ptCursor->x += get_adjust_dx();
-    ptCursor->y -= get_adjust_dy();
-    return CTemporaryStatView::ShowToolTip(this, uiToolTip, ptCursor, rx, ry);
-}
-
-void CTemporaryStatView::FindIcon_hook(POINT* ptCursor, int& nType, int& nID) {
-    ptCursor->x += get_adjust_dx();
-    ptCursor->y -= get_adjust_dy();
-    CTemporaryStatView::FindIcon(this, ptCursor, nType, nID);
-}
-
-
-HRESULT __stdcall CAvatarMegaphone__raw_RelMove_hook1(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
-    nX = get_screen_width() + get_adjust_dx();
-    nY = get_adjust_dy();
-    return pThis->raw_RelMove(nX, nY, nTime, nType);
-}
-
-HRESULT __stdcall CAvatarMegaphone__raw_RelMove_hook2(IWzGr2DLayer* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
-    nX = get_screen_width() + get_adjust_dx() - 225;
-    nY = get_adjust_dy();
-    return pThis->raw_RelMove(nX, nY, nTime, nType);
-}
-
-
-class CSlideNotice : public CWnd, public TSingleton<CSlideNotice, 0x00BF0DF4> {
-public:
-    MEMBER_HOOK(void, 0x007E16FE, SetMsg, void* sNotice) // ZXString<char>
-};
-
-void CSlideNotice::SetMsg_hook(void* sNotice) {
-    CSlideNotice::SetMsg(this, sNotice);
-    MoveWnd(get_adjust_dx(), get_adjust_dy());
 }
 
 
@@ -480,24 +522,6 @@ int __stdcall CField__ShowMobHPTag_hook1() {
     return 0;
 }
 
-IWzGr2DLayerPtr* __fastcall CField__ShowMobHPTag_hook2(IWzGr2D* pThis, void* _EDX, IWzGr2DLayerPtr* result, int nLeft, int nTop, unsigned int uWidth, unsigned int uHeight, int nZ, const Ztl_variant_t& vCanvas, const Ztl_variant_t& dwFilter) {
-    HRESULT hr = pThis->raw_CreateLayer(nLeft, get_adjust_dy(), uWidth, uHeight, nZ, vCanvas, dwFilter, &result->GetInterfacePtr());
-    if (FAILED(hr)) _com_issue_errorex(hr, pThis, __uuidof(pThis));
-    return result;
-}
-
-
-class CWvsContext : public TSingleton<CWvsContext, 0x00BE7918> {
-public:
-    MEMBER_AT(CTemporaryStatView, 0x2EA8, m_temporaryStatView)
-    MEMBER_AT(ZRef<CWnd>, 0x36C8, m_pClock) // ZRef<CClock>
-};
-
-void set_clock_position(CWnd* pClock) {
-    if (pClock && pClock->m_bScreenCoord) {
-        pClock->MoveWnd(pClock->GetAbsLeft(), 30 + get_adjust_dy());
-    }
-}
 
 void set_screen_resolution(int nResolution, bool bSave) {
     int nScreenWidth = 800;
@@ -522,50 +546,27 @@ void set_screen_resolution(int nResolution, bool bSave) {
     }
     if (nScreenWidth != g_nScreenWidth || nScreenHeight != g_nScreenHeight) {
         IWzGr2D_DX9Ptr gr = get_gr()->GetInner();
-        if (SUCCEEDED(gr->screenResolution(nScreenWidth, nScreenHeight))) {
-            g_nScreenWidth = nScreenWidth;
-            g_nScreenHeight = nScreenHeight;
-            g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
-            gr->AdjustCenter(0, -g_nAdjustCenterY);
+        if (FAILED(gr->screenResolution(nScreenWidth, nScreenHeight))) {
+            return;
+        }
+        g_nScreenWidth = nScreenWidth;
+        g_nScreenHeight = nScreenHeight;
+        g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
+        gr->AdjustCenter(0, -g_nAdjustCenterY);
+        if (CWndMan::IsInstantiated()) {
+            CWndMan::GetInstance()->ResetOrgWindow();
             // Adjust CUtilDlgEx position
-            sRectQuestDlg.top = get_screen_height() / 2 + get_adjust_dy();
-            sRectQuestDlg.left = get_screen_width() / 2 + get_adjust_dx();
-            // Reposition open windows
-            if (CWndMan::IsInstantiated()) {
-                auto pos = CWndMan::ms_lpWindow.GetHeadPosition();
-                while (pos) {
-                    auto pNext = CWndMan::ms_lpWindow.GetNext(pos);
-                    // (pNext == CUIStatusBar::GetInstance() || pNext->IsKindOf(CUIWnd::ms_RTTI_CUIWnd))
-                    if (pNext == reinterpret_cast<CWnd*>(0x00BEC208) || !pNext->IsKindOf(reinterpret_cast<const CRTTI*>(0x00BF11DC))) {
-                        continue;
-                    }
-                    if (pNext->GetAbsLeft() > get_adjust_dx() - 5 && pNext->GetAbsLeft() < get_screen_width() + get_adjust_dx() - 6 &&
-                            pNext->GetAbsTop() > get_adjust_dy() - 5 && pNext->GetAbsTop() < get_screen_height() + get_adjust_dy() - 6) {
-                        continue;
-                    }
-                    auto pUIWnd = reinterpret_cast<CUIWnd*>(pNext);
-                    int nUIType = pUIWnd->m_nUIType;
-                    int nDefaultX;
-                    int nDefaultY;
-                    get_default_position(nUIType, &nDefaultX, &nDefaultY);
-                    pUIWnd->MoveWnd(nDefaultX, nDefaultY);
-                }
-            }
-            if (CSlideNotice::IsInstantiated()) {
-                CSlideNotice::GetInstance()->MoveWnd(get_adjust_dx(), get_adjust_dy());
-            }
-            if (CWvsContext::IsInstantiated()) {
-                CWvsContext::GetInstance()->m_temporaryStatView.AdjustPosition_hook();
-            }
-            CField* field = get_field();
-            if (field) {
-                // CMapLoadable::OnEventChangeScreenResolution
-                field->RestoreViewRange_hook();
-                field->ReloadBack();
-                // Reposition clocks
-                set_clock_position(field->m_pClock);
-                set_clock_position(CWvsContext::GetInstance()->m_pClock);
-            }
+            sRectQuestDlg.top = get_screen_height() / 2;
+            sRectQuestDlg.left = get_screen_width() / 2;
+        }
+        if (CWvsContext::IsInstantiated()) {
+            CWvsContext::GetInstance()->m_temporaryStatView.AdjustPosition_hook();
+        }
+        CField* field = get_field();
+        if (field) {
+            field->RestoreViewRange_hook();
+            // CMapLoadable::ReloadBack
+            reinterpret_cast<void(__thiscall*)(CMapLoadable*)>(0x00644491)(field);
         }
     }
     if (bSave) {
@@ -611,23 +612,55 @@ void __fastcall CWzGr2D_DX9__RepositionWindow_hook(CWzGr2D_DX9* pThis, void* _ED
 
 void AttachResolutionMod() {
     ATTACH_HOOK(set_stage, set_stage_hook);
+    ATTACH_HOOK(CConfig::GetUIWndPos, CConfig::GetUIWndPos_hook);
     ATTACH_HOOK(CConfig::LoadCharacter, CConfig::LoadCharacter_hook);
     ATTACH_HOOK(CConfig::LoadGlobal, CConfig::LoadGlobal_hook);
     ATTACH_HOOK(CConfig::SaveGlobal, CConfig::SaveGlobal_hook);
     ATTACH_HOOK(CConfig::ApplySysOpt, CConfig::ApplySysOpt_hook);
     ATTACH_HOOK(CUISysOpt::OnCreate, CUISysOpt::OnCreate_hook);
     ATTACH_HOOK(CUISysOpt::Destructor, CUISysOpt::Destructor_hook);
-    // CUISysOpt::OnCreate - shift ok/cancel buttons
-    Patch4(0x009945BC + 1, 372);
+    Patch4(0x009945BC + 1, 372);               // CUISysOpt::OnCreate - shift ok/cancel buttons
+    Patch4(0x009F7078 + 1, SCREEN_HEIGHT_MAX); // CWvsApp::CreateWndManager - nHeight
+    Patch4(0x009F707D + 1, SCREEN_WIDTH_MAX);  // CWvsApp::CreateWndManager - nWidth
 
     ATTACH_HOOK(CInputSystem::SetCursorVectorPos, CInputSystem::SetCursorVectorPos_hook);
     ATTACH_HOOK(CInputSystem::SetCursorPos, CInputSystem::SetCursorPos_hook);
-    ATTACH_HOOK(CWndMan::GetCursorPos, CWndMan::GetCursorPos_hook);
-    ATTACH_HOOK(CWndMan::GetHandlerFromPoint, CWndMan::GetHandlerFromPoint_hook);
+    ATTACH_HOOK(CWndMan::Constructor, CWndMan::Constructor_hook);
+    ATTACH_HOOK(CWndMan::Destructor, CWndMan::Destructor_hook);
+    ATTACH_HOOK(CWndMan::GetOrgWindow, CWndMan::GetOrgWindow_hook);
+    ATTACH_HOOK(CWnd::CreateWnd, CWnd::CreateWnd_hook);
+
+    // CWorldMapDlg::CreateWorldMapDlg - adjust world map dialog y position
+    PatchCall(0x009EB5A3, &CDialog__CreateDlg_hook);
+
+    // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
+    ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);
+
+    // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
+    ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
+
+    // CTemporaryStatView - reposition buff display
+    ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
 
     // CMapLoadable - handle view range
     ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
+
+    // CMapLoadable::TransientLayer_Weather - weather effects
+    PatchCall(0x0064106B, CMapLoadable__raw_WrapClip_hook, 6);
+    Patch4(0x0064043E + 1, SCREEN_WIDTH_MAX / 2);
+    Patch4(0x00640443 + 1, SCREEN_HEIGHT_MAX / 2);
+    Patch4(0x00640599 + 2, SCREEN_WIDTH_MAX / 2 - 10);
+    Patch4(0x006405BA + 2, SCREEN_HEIGHT_MAX - 10);
+    Patch4(0x00640606 + 1, SCREEN_WIDTH_MAX);
+    Patch4(0x00640618 + 1, SCREEN_HEIGHT_MAX);
+    Patch4(0x00640626 + 1, SCREEN_WIDTH_MAX / 2);
+    Patch4(0x00640639 + 1, SCREEN_WIDTH_MAX);
+    Patch4(0x0064064B + 1, SCREEN_HEIGHT_MAX);
+    Patch4(0x00640656 + 2, -SCREEN_WIDTH_MAX / 2);
+    Patch4(0x006406C3 + 1, SCREEN_WIDTH_MAX);
+    Patch4(0x006406D5 + 1, SCREEN_HEIGHT_MAX);
+    Patch4(0x006406FA + 2, SCREEN_HEIGHT_MAX / 2);
 
     // CField_LimitedView::Init
     Patch4(0x0055B808 + 1, SCREEN_HEIGHT_MAX);                                      // m_pCanvasDark->raw_Create - uHeight
@@ -646,46 +679,14 @@ void AttachResolutionMod() {
     PatchJmp(0x009DFD01, 0x009DFDAA);
     PatchJmp(0x009DFDBB, 0x009DFE4D);
     PatchJmp(0x009DFE7E, 0x009DFF29);
-    // CWnd::CreateWnd - reposition dialogs
-    PatchCall(0x004EDAE6, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, int, int, int, void*)
-    PatchCall(0x004EDB95, CWnd__CreateWnd_hook); // CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
-    // CWorldMapDlg::CreateWorldMapDlg - adjust world map dialog y position
-    PatchCall(0x009EB5A3, &CDialog__CreateDlg_hook);
 
-    // CWnd::CreateWnd - reposition CClock
-    PatchCall(0x005362B7, CWnd__CreateWnd_CClock_hook); // CField::OnClock(CField*, int)
-    PatchCall(0x00536386, CWnd__CreateWnd_CClock_hook); // CField::OnClock(CField*, int)
-    PatchCall(0x00545D1F, CWnd__CreateWnd_CClock_hook); // CField_Battlefield::OnClock(CField*, int)
-    PatchCall(0x00560429, CWnd__CreateWnd_CClock_hook); // CField_Massacre::OnClock(CField*, int)
-    PatchCall(0x00578B2B, CWnd__CreateWnd_CClock_hook); // CField_SpaceGAGA::OnClock(CField*, int)
-    PatchCall(0x00A24D10, CWnd__CreateWnd_CClock_hook); // CWvsContext::SetEventTimer(CWvsContext*, int)
-
-    // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
-    ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);
-
-    // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
-    ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
-
-    // CTemporaryStatView - reposition buff display
-    ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
-    ATTACH_HOOK(CTemporaryStatView::ShowToolTip, CTemporaryStatView::ShowToolTip_hook);
-    ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
-
-    // CAvatarMegaphone - reposition avatar megaphone
-    PatchCall(0x0045B341, &CAvatarMegaphone__raw_RelMove_hook1, 6); // CAvatarMegaphone::HelloAvatarMegaphone - start position
-    PatchCall(0x0045B421, &CAvatarMegaphone__raw_RelMove_hook2, 6); // CAvatarMegaphone::HelloAvatarMegaphone - end position
-    PatchCall(0x0045B8A1, &CAvatarMegaphone__raw_RelMove_hook2, 6); // CAvatarMegaphone::ByeAvatarMegaphone - start position
-    PatchCall(0x0045B985, &CAvatarMegaphone__raw_RelMove_hook1, 6); // CAvatarMegaphone::ByeAvatarMegaphone - end position
-
-    // CSlideNotice - sliding notice position and width
-    ATTACH_HOOK(CSlideNotice::SetMsg, CSlideNotice::SetMsg_hook);
+    // CSlideNotice - sliding notice width
     Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice
     Patch4(0x007E16BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::OnCreate
     Patch4(0x007E1E07 + 2, SCREEN_WIDTH_MAX); // CSlideNotice::SetMsg
 
     // CField::ShowMobHPTag - boss hp bar position
     PatchCall(0x00533705, &CField__ShowMobHPTag_hook1, 15); // nLeft
-    PatchCall(0x00533B16, &CField__ShowMobHPTag_hook2); // IWzGr2D::CreateLayer - set layer position
 
     // CScreenShot::SaveFullScreenToJpg
     ATTACH_HOOK(CScreenShot__SaveFullScreenToJpg, CScreenShot__SaveFullScreenToJpg_hook);

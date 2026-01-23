@@ -10,11 +10,25 @@ struct DRAGCTX;
 
 class CWnd : public IGObj, public IUIMsgHandler, public ZRefCounted {
 public:
+    enum UIOrigin {
+        Origin_LT = 0x0,
+        Origin_CT = 0x1,
+        Origin_RT = 0x2,
+        Origin_LC = 0x3,
+        Origin_CC = 0x4,
+        Origin_RC = 0x5,
+        Origin_LB = 0x6,
+        Origin_CB = 0x7,
+        Origin_RB = 0x8,
+        Origin_NUM = 0x9,
+    };
+
     MEMBER_AT(IWzGr2DLayerPtr, 0x18, m_pLayer)
     MEMBER_AT(IWzGr2DLayerPtr, 0x20, m_pOverlabLayer)
     MEMBER_AT(int, 0x24, m_width)
     MEMBER_AT(int, 0x28, m_height)
     MEMBER_AT(int, 0x3C, m_bScreenCoord)
+    MEMBER_HOOK(void, 0x009DE4D2, CreateWnd, int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) // resolution.cpp
 
     virtual void Update() override {}
     virtual int OnDragDrop(int nState, DRAGCTX& ctx, int rx, int ry) { return 0; }
