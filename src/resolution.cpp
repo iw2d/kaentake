@@ -304,7 +304,12 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     case 0x006CD787: // CNoticeQuestProgress::CNoticeQuestProgress
         result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CT);
         break;
+    case 0x009603F2: // CUserLocal::DrawCombo
+        result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_RT);
+        break;
     case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
+    case 0x008DEB75: // CUIStatusBar::FlashHPBar
+    case 0x008DEE11: // CUIStatusBar::FlashMPBar
         result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
         break;
     default:
