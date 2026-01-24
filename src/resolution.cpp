@@ -304,6 +304,9 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     case 0x006CD787: // CNoticeQuestProgress::CNoticeQuestProgress
         result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CT);
         break;
+    case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
+        result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
+        break;
     default:
         if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
             result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
