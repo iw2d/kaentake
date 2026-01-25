@@ -45,12 +45,16 @@ void AttachSystemHooks();
 
 // called in system.cpp -> CreateMutexA_hook
 void AttachClientBypass();
+void AttachClientInlink();
 void AttachResManMod();
+void AttachAvatarDataMod();
 void AttachResolutionMod();
 
 inline void AttachClientHooks() {
     AttachClientBypass();
+    AttachClientInlink();
     AttachResManMod();
+    AttachAvatarDataMod();
     AttachResolutionMod();
 }
 
@@ -74,6 +78,8 @@ void* GetAddress(const char* sModuleName, const char* sProcName);
 void* GetAddressByPattern(const char* sModuleName, const char* sPattern);
 
 void PatchMemory(void* pAddress, void* pValue, size_t uSize);
+
+void PatchAllByPattern(void* pStart, void* pEnd, const char* sPattern, void* pValue, size_t uSize);
 
 
 template <typename T>
