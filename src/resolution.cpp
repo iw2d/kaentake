@@ -145,7 +145,7 @@ public:
 
 void CConfig::GetUIWndPos_hook(int nUIType, int* x, int* y, int* op) {
     CConfig::GetUIWndPos(this, nUIType, x, y, op);
-    if (*x < -5 || *x > get_screen_width() - 6 || *y < -5 || *y > get_screen_height() -6) {
+    if (*x < -5 || *x > get_screen_width() - 6 || *y < -5 || *y > get_screen_height() - 6) {
         get_default_position(nUIType, x, y);
     }
 }
@@ -300,12 +300,16 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
     switch (ret) {
     case 0x00533B77: // CField::ShowMobHPTag
+    case 0x005555B7: // CField_Dojang::OnClock
     case 0x0058C91C: // CFloatNotice::CreateFloatNotice
     case 0x006CD787: // CNoticeQuestProgress::CNoticeQuestProgress
         result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CT);
         break;
     case 0x009603F2: // CUserLocal::DrawCombo
         result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_RT);
+        break;
+    case 0x0053502B: // CField::ShowScreenEffect
+        result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CC);
         break;
     case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
     case 0x008DEB75: // CUIStatusBar::FlashHPBar
@@ -315,6 +319,8 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     default:
         if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
             result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
+        } else if (ret >= 0x00554005 && ret <= 0x0055478F) { // CField_Dojang::Init
+            result->GetInterfacePtr() = GetOrgWindowEx(Origin_CT);
         } else {
             result->GetInterfacePtr() = m_pOrgWindow;
         }
@@ -330,6 +336,11 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
     if (ret == 0x004EDAEB || ret == 0x004EDB9A) {
         l = (get_screen_width() - w) / 2;
         t = (get_screen_height() - h) / 2;
+    }
+    // CDialog::CreateDlg(CDialog*, int, int, int, int, int, int, void*)
+    if (ret == 0x004EDAB3) {
+        l = l + (get_screen_width() - 800) / 2;
+        t = t + (get_screen_height() - 600) / 2;
     }
     CWnd::CreateWnd(this, l, t, w, h, z, bScreenCoord, pData, bSetFocus);
     if (!bScreenCoord) {
@@ -354,9 +365,38 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
     }
 }
 
+static auto CWnd__PreCreateWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int, int, int, int, int, void*)>(0x009DE7FB);
+void __fastcall CWnd__PreCreateWnd_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
+    auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
+    // CEngageDlg::PreCreateWnd || CUtilDlg::PreCreateWnd
+    if (ret == 0x00515D9C || ret == 0x00991873) {
+        l = l + (get_screen_width() - 800) / 2;
+        t = t + (get_screen_height() - 600) / 2;
+    }
+    CWnd__PreCreateWnd(pThis, l, t, w, h, z, bScreenCoord, pData);
+}
 
-void __fastcall CDialog__CreateDlg_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
-    CWnd::CreateWnd(pThis, l + (get_screen_width() - 800) / 2, t + (get_screen_height() - 600) / 2, w, h, z, bScreenCoord, pData, 1);
+static auto CWnd__OnMoveWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int)>(0x009DEB57);
+void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
+    CWnd__OnMoveWnd(pThis, l, t);
+    int nAbsLeft = pThis->GetAbsLeft();
+    int nAbsTop = pThis->GetAbsTop();
+    if (abs(nAbsLeft) <= 10) {
+        pThis->m_pLayer->lt->RelMove(0, nAbsTop);
+    }
+    if (abs(nAbsTop) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nAbsLeft, 0);
+    }
+    int nWidth = pThis->m_pLayer->width;
+    int nBoundX = get_screen_width();
+    if (abs(nAbsLeft + nWidth - nBoundX) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nBoundX - nWidth, nAbsTop);
+    }
+    int nHeight = pThis->m_pLayer->height;
+    int nBoundY = get_screen_height();
+    if (abs(nAbsTop + nHeight - nBoundY) <= 10) {
+        pThis->m_pLayer->lt->RelMove(nAbsLeft, nBoundY - nHeight);
+    }
 }
 
 
@@ -496,30 +536,6 @@ HRESULT __fastcall CField_LimitedView__CopyEx_hook(IWzCanvas* pThis, void* _EDX,
 }
 
 
-static auto CWnd__OnMoveWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int)>(0x009DEB57);
-void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
-    CWnd__OnMoveWnd(pThis, l, t);
-    int nAbsLeft = pThis->GetAbsLeft();
-    int nAbsTop = pThis->GetAbsTop();
-    if (abs(nAbsLeft) <= 10) {
-        pThis->m_pLayer->lt->RelMove(0, nAbsTop);
-    }
-    if (abs(nAbsTop) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nAbsLeft, 0);
-    }
-    int nWidth = pThis->m_pLayer->width;
-    int nBoundX = get_screen_width();
-    if (abs(nAbsLeft + nWidth - nBoundX) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nBoundX - nWidth, nAbsTop);
-    }
-    int nHeight = pThis->m_pLayer->height;
-    int nBoundY = get_screen_height();
-    if (abs(nAbsTop + nHeight - nBoundY) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nAbsLeft, nBoundY - nHeight);
-    }
-}
-
-
 class CUIMiniMap : public CUIWnd, public TSingleton<CUIMiniMap, 0x00BED788> {
 };
 
@@ -637,9 +653,13 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CWndMan::Destructor, CWndMan::Destructor_hook);
     ATTACH_HOOK(CWndMan::GetOrgWindow, CWndMan::GetOrgWindow_hook);
     ATTACH_HOOK(CWnd::CreateWnd, CWnd::CreateWnd_hook);
-
-    // CWorldMapDlg::CreateWorldMapDlg - adjust world map dialog y position
-    PatchCall(0x009EB5A3, &CDialog__CreateDlg_hook);
+    ATTACH_HOOK(CWnd__PreCreateWnd, CWnd__PreCreateWnd_hook);
+    ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
+    // CWnd::OnMoveWnd - delegate edge snapping to CWnd__OnMoveWnd_hook
+    PatchJmp(0x009DFBFE, 0x009DFCC3);
+    PatchJmp(0x009DFD01, 0x009DFDAA);
+    PatchJmp(0x009DFDBB, 0x009DFE4D);
+    PatchJmp(0x009DFE7E, 0x009DFF29);
 
     // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
     ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);
@@ -680,13 +700,6 @@ void AttachResolutionMod() {
     PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
     PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);
     PatchCall(0x0055C1DD, &CField_LimitedView__CopyEx_hook);
-
-    // CWnd::OnMoveWnd - handle snapping to screen bounds
-    ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
-    PatchJmp(0x009DFBFE, 0x009DFCC3);
-    PatchJmp(0x009DFD01, 0x009DFDAA);
-    PatchJmp(0x009DFDBB, 0x009DFE4D);
-    PatchJmp(0x009DFE7E, 0x009DFF29);
 
     // CSlideNotice - sliding notice width
     Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice
