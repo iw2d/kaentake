@@ -44,6 +44,9 @@ size_t ParsePattern(const char* sPattern, unsigned char* abPattern, unsigned cha
 }
 
 void* FindPattern(unsigned char* pModuleBase, size_t uModuleSize, unsigned char* abPattern, unsigned char* abMask, size_t uPatternSize) {
+    if (uModuleSize < uPatternSize) {
+        return nullptr;
+    }
     for (size_t i = 0; i <= uModuleSize - uPatternSize; ++i) {
         size_t j;
         for (j = 0; j < uPatternSize; ++j) {
@@ -145,4 +148,25 @@ void PatchMemory(void* pAddress, void* pValue, size_t uSize) {
     VirtualProtect(pAddress, uSize, PAGE_EXECUTE_READWRITE, &flOldProtect);
     memcpy(pAddress, pValue, uSize);
     VirtualProtect(pAddress, uSize, flOldProtect, &flOldProtect);
+}
+
+void PatchAllByPattern(void* pStart, void* pEnd, const char* sPattern, void* pValue, size_t uSize) {
+    unsigned char abPattern[1024];
+    unsigned char abMask[1024];
+    size_t uPatternSize = ParsePattern(sPattern, abPattern, abMask);
+    if (uPatternSize == 0) {
+        ErrorMessage("Could not parse pattern : %s", sPattern);
+        return;
+    }
+
+    unsigned char* pCurrent = static_cast<unsigned char*>(pStart);
+    while (pCurrent < pEnd) {
+        size_t uRemainSize = reinterpret_cast<uintptr_t>(pEnd) - reinterpret_cast<uintptr_t>(pCurrent);
+        void* pTarget = FindPattern(pCurrent, uRemainSize, abPattern, abMask, uPatternSize);
+        if (!pTarget) {
+            break;
+        }
+        PatchMemory(pTarget, pValue, uSize);
+        pCurrent += uSize;
+    }
 }

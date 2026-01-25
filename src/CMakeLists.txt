@@ -3,7 +3,9 @@ add_library(injector SHARED
     injector.cpp
     system.cpp
     bypass.cpp
+    inlink.cpp
     resman.cpp
+    avatar.cpp
     resolution.cpp
     debug.cpp
     hook.cpp
