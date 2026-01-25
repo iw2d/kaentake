@@ -97,6 +97,9 @@ class CInputSystem : public TSingleton<CInputSystem, 0x00BEC33C> {
 class CConfig : public TSingleton<CConfig, 0x00BEBF9C> {
 };
 
+class CActionMan : public TSingleton<CActionMan, 0x00BE78D4> {
+};
+
 void CWvsApp::Constructor_hook() {
     DEBUG_MESSAGE("CWvsApp::CWvsApp");
     ms_pInstance = this;
@@ -233,6 +236,10 @@ void CWvsApp::CallUpdate_hook(int tCurTime) {
         }
     }
     get_gr()->UpdateCurrentTime(tCurTime);
+    if (CActionMan::IsInstantiated()) {
+        // CActionMan::GetInstance()->SweepCache();
+        reinterpret_cast<void(__thiscall*)(CActionMan*)>(0x00411BBB)(CActionMan::GetInstance());
+    }
 }
 
 void CWvsApp::Run_hook(int* pbTerminate) {
