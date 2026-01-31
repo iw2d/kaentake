@@ -5,8 +5,8 @@ add_library(injector SHARED
     bypass.cpp
     inlink.cpp
     resman.cpp
+    avatar.cpp
     resolution.cpp
-    portablechair.cpp
     debug.cpp
     hook.cpp
 )

@@ -47,15 +47,15 @@ void AttachSystemHooks();
 void AttachClientBypass();
 void AttachClientInlink();
 void AttachResManMod();
+void AttachAvatarDataMod();
 void AttachResolutionMod();
-void AttachPortableChairMod();
 
 inline void AttachClientHooks() {
     AttachClientBypass();
     AttachClientInlink();
     AttachResManMod();
+    AttachAvatarDataMod();
     AttachResolutionMod();
-    AttachPortableChairMod();
 }
 
 
