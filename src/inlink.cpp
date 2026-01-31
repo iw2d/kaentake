@@ -25,7 +25,7 @@ public:
     }
 };
 
-void handle_link_property(IWzCanvasPtr pCanvas) {
+void HandleLinkProperty(IWzCanvasPtr pCanvas) {
     // Check for link property
     const wchar_t* asLinkProperty[] = {
             L"_inlink",
@@ -59,7 +59,7 @@ IUnknownPtr* __cdecl get_unknown_hook(IUnknownPtr* result, Ztl_variant_t* v) {
     get_unknown_orig(result, v);
     IWzCanvasPtr pCanvas;
     if (SUCCEEDED(result->QueryInterface(__uuidof(IWzCanvas), &pCanvas))) {
-        handle_link_property(pCanvas);
+        HandleLinkProperty(pCanvas);
     }
     return result;
 }
@@ -69,7 +69,7 @@ IUnknown* __fastcall Ztl_variant_t__GetUnknown_hook(Ztl_variant_t* pThis, void* 
     IUnknownPtr result = pThis->GetUnknown(fAddRef, fTryChangeType);
     IWzCanvasPtr pCanvas;
     if (SUCCEEDED(result.QueryInterface(__uuidof(IWzCanvas), &pCanvas))) {
-        handle_link_property(pCanvas);
+        HandleLinkProperty(pCanvas);
     }
     return result;
 }

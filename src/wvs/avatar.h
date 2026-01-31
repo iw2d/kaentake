@@ -6,8 +6,8 @@
 class CAvatar {
 public:
     struct CustomData {
-        int m_bBlinking;
-        POINT m_ptBodyRelMove;
+        int bBlinking;
+        POINT ptBodyRelMove;
     };
 
     virtual ~CAvatar() = 0;

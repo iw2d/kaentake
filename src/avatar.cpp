@@ -17,7 +17,7 @@ void CAvatar::Destructor_hook() {
 }
 
 void CAvatar::RegisterNextBlink_hook() {
-    m_pCustomData->m_bBlinking = 0;
+    m_pCustomData->bBlinking = 0;
     m_tNextBlink = CWvsApp::GetInstance()->m_tUpdateTime + (rand() % 3000) + 2000;
 }
 
@@ -52,7 +52,7 @@ public:
 
 void CUser::Update_hook() {
     CUser::Update(this);
-    POINT p = m_Avatar.m_pCustomData->m_ptBodyRelMove;
+    POINT p = m_Avatar.m_pCustomData->ptBodyRelMove;
     if (p.x || p.y) {
         m_Avatar.m_pBodyOrigin->RelMove(p.x, p.y);
     }
@@ -61,7 +61,7 @@ void CUser::Update_hook() {
 void CUser::SetActivePortableChair_hook(int nItemID) {
     CUser::SetActivePortableChair(this, nItemID);
     if (nItemID == 0) {
-        m_Avatar.m_pCustomData->m_ptBodyRelMove = {0, 0};
+        m_Avatar.m_pCustomData->ptBodyRelMove = {0, 0};
         return;
     }
     // Resolve bodyRelMove offsets
@@ -75,7 +75,7 @@ void CUser::SetActivePortableChair_hook(int nItemID) {
         return;
     }
     // Store to CAvatar->m_pCustomData struct
-    m_Avatar.m_pCustomData->m_ptBodyRelMove = {pVector->x, pVector->y};
+    m_Avatar.m_pCustomData->ptBodyRelMove = {pVector->x, pVector->y};
 }
 
 

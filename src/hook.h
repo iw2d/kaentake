@@ -79,6 +79,8 @@ void* GetAddressByPattern(const char* sModuleName, const char* sPattern);
 
 void PatchMemory(void* pAddress, void* pValue, size_t uSize);
 
+void PatchAllByPattern(void* pStart, void* pEnd, const char* sPattern, void* pValue, size_t uSize);
+
 
 template <typename T>
 void Patch1(T pAddress, unsigned char uValue) {
