@@ -331,21 +331,11 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
 }
 
 void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) {
-    auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
-    // CDialog::CreateDlg(CDialog*, int, int, int, void*) || CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
-    if (ret == 0x004EDAEB || ret == 0x004EDB9A) {
-        l = (get_screen_width() - w) / 2;
-        t = (get_screen_height() - h) / 2;
-    }
-    // CDialog::CreateDlg(CDialog*, int, int, int, int, int, int, void*)
-    if (ret == 0x004EDAB3) {
-        l = l + (get_screen_width() - 800) / 2;
-        t = t + (get_screen_height() - 600) / 2;
-    }
     CWnd::CreateWnd(this, l, t, w, h, z, bScreenCoord, pData, bSetFocus);
     if (!bScreenCoord) {
         return;
     }
+    auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
     switch (ret) {
     case 0x005362BC: // CField::OnClock(CField*, int)
     case 0x0053638B: // CField::OnClock(CField*, int)
@@ -357,6 +347,11 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
         return;
     case 0x0045A5EF: // CAvatarMegaphone::CAvatarMegaphone
         m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(CWnd::UIOrigin::Origin_RT));
+        return;
+    case 0x004EDAEB: // CDialog::CreateDlg(CDialog*, int, int, int, void*)
+    case 0x004EDB9A: // CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
+    case 0x004EDAB3: // CDialog::CreateDlg(CDialog*, int, int, int, int, int, int, void*)
+        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(CWnd::UIOrigin::Origin_CC));
         return;
     case 0x0051FA03: // CFadeWnd::CreateFadeWnd
     case 0x008CFD65: // CUIStatusBar::CUIStatusBar
@@ -377,25 +372,81 @@ void __fastcall CWnd__PreCreateWnd_hook(CWnd* pThis, void* _EDX, int l, int t, i
 }
 
 static auto CWnd__OnMoveWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int)>(0x009DEB57);
+
+void MoveWndToAbsPos(CWnd* pWnd, int l, int t) {
+    IWzVector2DPtr pAbsOrigin = CWndMan::GetInstance()->m_pOrgWindow;
+    IWzVector2DPtr pWndOrigin = static_cast<IUnknown*>(pWnd->m_pLayer->origin);
+    int nOffsetX = pAbsOrigin->x - pWndOrigin->x;
+    int nOffsetY = pAbsOrigin->y - pWndOrigin->y;
+    pWnd->m_pLayer->RelMove(l + nOffsetX, t + nOffsetY);
+}
+
 void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
-    CWnd__OnMoveWnd(pThis, l, t);
-    int nAbsLeft = pThis->GetAbsLeft();
-    int nAbsTop = pThis->GetAbsTop();
-    if (abs(nAbsLeft) <= 10) {
-        pThis->m_pLayer->lt->RelMove(0, nAbsTop);
-    }
-    if (abs(nAbsTop) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nAbsLeft, 0);
-    }
+    int nLeft = pThis->GetAbsLeft();
+    int nTop = pThis->GetAbsTop();
     int nWidth = pThis->m_pLayer->width;
-    int nBoundX = get_screen_width();
-    if (abs(nAbsLeft + nWidth - nBoundX) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nBoundX - nWidth, nAbsTop);
-    }
     int nHeight = pThis->m_pLayer->height;
-    int nBoundY = get_screen_height();
-    if (abs(nAbsTop + nHeight - nBoundY) <= 10) {
-        pThis->m_pLayer->lt->RelMove(nAbsLeft, nBoundY - nHeight);
+    // Save m_ptCursorRel
+    POINT pt;
+    CInputSystem::GetInstance()->GetCursorPos(&pt);
+    POINT ptRel;
+    ptRel.x = pt.x - nLeft;
+    ptRel.y = pt.y - nTop;
+    if (pThis->m_ptCursorRel.x == -1 && pThis->m_ptCursorRel.y == -1) {
+        pThis->m_ptCursorRel.x = ptRel.x;
+        pThis->m_ptCursorRel.y = ptRel.y;
+    }
+    // Iterate ZList<CWnd*> for window snapping
+    RECT rcThis;
+    SetRect(&rcThis, nLeft, nTop, nLeft + nWidth, nTop + nHeight);
+    auto pos = CWndMan::ms_lpWindow.GetHeadPosition();
+    while (pos) {
+        auto pNext = CWndMan::ms_lpWindow.GetNext(pos);
+        if (pNext == pThis || pThis->IsMyAddOn(pNext) ||
+                pNext == reinterpret_cast<CWnd*>(0x00BEC208)) { // TSingleton<CUIStatusBar>::ms_pInstance
+            continue;
+        }
+        int nNextLeft = pNext->GetAbsLeft();
+        int nNextTop = pNext->GetAbsTop();
+        int nNextWidth = pNext->m_pLayer->width;
+        int nNextHeight = pNext->m_pLayer->height;
+        RECT rcNext, rcIntersect;
+        SetRect(&rcNext, nNextLeft - 10, nNextTop - 10, nNextLeft + nNextWidth + 10, nNextTop + nNextHeight + 10);
+        if (!IntersectRect(&rcIntersect, &rcThis, &rcNext)) {
+            continue;
+        }
+        if (abs(nLeft - nNextLeft - nNextWidth) <= 10) {
+            MoveWndToAbsPos(pThis, nNextLeft + nNextWidth, nTop);
+        }
+        if (abs(nLeft - nNextLeft + nWidth) <= 10) {
+            MoveWndToAbsPos(pThis, nNextLeft - nWidth, nTop);
+        }
+        if (abs(nTop - nNextTop - nNextHeight) <= 10) {
+            MoveWndToAbsPos(pThis, nLeft, nNextTop + nNextHeight);
+        }
+        if (abs(nTop - nNextTop + nHeight) <= 10) {
+            MoveWndToAbsPos(pThis, nLeft, nNextTop - nHeight);
+        }
+    }
+    // Window snapping to screen border
+    if (abs(nLeft) <= 10) {
+        MoveWndToAbsPos(pThis, 0, nTop);
+    }
+    if (abs(nTop) <= 10) {
+        MoveWndToAbsPos(pThis, nLeft, 0);
+    }
+    if (abs(nLeft + nWidth - get_screen_width()) <= 10) {
+        MoveWndToAbsPos(pThis, get_screen_width() - nWidth, nTop);
+    }
+    if (abs(nTop + nHeight - get_screen_height()) <= 10) {
+        MoveWndToAbsPos(pThis, nLeft, get_screen_height() - nHeight);
+    }
+    // Handle m_ptCursorRel
+    if (abs(pThis->m_ptCursorRel.x - ptRel.x) > 15) {
+        MoveWndToAbsPos(pThis, pt.x - pThis->m_ptCursorRel.x, nTop);
+    }
+    if (abs(pThis->m_ptCursorRel.y - ptRel.y) > 15) {
+        MoveWndToAbsPos(pThis, nLeft, pt.y - pThis->m_ptCursorRel.y);
     }
 }
 
@@ -655,11 +706,6 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CWnd::CreateWnd, CWnd::CreateWnd_hook);
     ATTACH_HOOK(CWnd__PreCreateWnd, CWnd__PreCreateWnd_hook);
     ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
-    // CWnd::OnMoveWnd - delegate edge snapping to CWnd__OnMoveWnd_hook
-    PatchJmp(0x009DFBFE, 0x009DFCC3);
-    PatchJmp(0x009DFD01, 0x009DFDAA);
-    PatchJmp(0x009DFDBB, 0x009DFE4D);
-    PatchJmp(0x009DFE7E, 0x009DFF29);
 
     // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
     ATTACH_HOOK(CUtilDlgEx::CreateUtilDlgEx, CUtilDlgEx::CreateUtilDlgEx_hook);

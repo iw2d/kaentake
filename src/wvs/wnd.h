@@ -28,6 +28,7 @@ public:
     MEMBER_AT(int, 0x24, m_width)
     MEMBER_AT(int, 0x28, m_height)
     MEMBER_AT(int, 0x3C, m_bScreenCoord)
+    MEMBER_AT(POINT, 0x48, m_ptCursorRel)
     MEMBER_HOOK(void, 0x009DE4D2, CreateWnd, int l, int t, int w, int h, int z, int bScreenCoord, void* pData, int bSetFocus) // resolution.cpp
 
     virtual void Update() override {}
@@ -42,7 +43,7 @@ public:
     virtual int HitTest(unsigned int rx, unsigned int ry, CCtrlWnd** ppCtrl) { return 0; }
     virtual int OnActivate(int bActive) { return 0; }
     virtual void Draw(const RECT* pRect) {}
-    virtual int IsMyAddOn() { return 0; }
+    virtual int IsMyAddOn(CWnd* pWnd) { return 0; }
 
     IWzGr2DLayerPtr GetLayer() {
         return m_pLayer;
