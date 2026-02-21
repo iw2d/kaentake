@@ -509,6 +509,8 @@ public:
     };
     MEMBER_AT(ZList<ZRef<TEMPORARY_STAT>>, 0x4, m_lTemporaryStat)
     MEMBER_HOOK(void, 0x007B2BB0, AdjustPosition)
+    MEMBER_HOOK(int, 0x007B2E58, ShowToolTip, CUIToolTip& uiToolTip, const POINT& ptCursor, int rx, int ry)
+    MEMBER_HOOK(int, 0x007B3055, FindIcon, const POINT& ptCursor, int& nType, int& nID)
 };
 
 void CTemporaryStatView::AdjustPosition_hook() {
@@ -521,6 +523,16 @@ void CTemporaryStatView::AdjustPosition_hook() {
         pNext->pLayerShadow->RelMove((32 - pNext->pLayerShadow->width) / 2 + nOffsetX, (32 - pNext->pLayerShadow->height) / 2 - nOffsetY);
         nOffsetX += 32;
     }
+}
+
+int CTemporaryStatView::ShowToolTip_hook(CUIToolTip& uiToolTip, const POINT& ptCursor, int rx, int ry) {
+    POINT ptAdjust = { ptCursor.x + 800 - get_screen_width(), ptCursor.y };
+    return CTemporaryStatView::ShowToolTip(this, uiToolTip, ptAdjust, rx, ry);
+}
+
+int CTemporaryStatView::FindIcon_hook(const POINT& ptCursor, int& nType, int& nID) {
+    POINT ptAdjust = { ptCursor.x + 800 - get_screen_width(), ptCursor.y };
+    return CTemporaryStatView::FindIcon(this, ptAdjust, nType, nID);
 }
 
 
@@ -715,6 +727,8 @@ void AttachResolutionMod() {
 
     // CTemporaryStatView - reposition buff display
     ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
+    ATTACH_HOOK(CTemporaryStatView::ShowToolTip, CTemporaryStatView::ShowToolTip_hook);
+    ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
 
     // CMapLoadable - handle view range
     ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
