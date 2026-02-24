@@ -26,3 +26,11 @@ inline int get_int32(Ztl_variant_t& v, int nDefault) {
 int get_screen_width();
 int get_screen_height();
 int get_adjust_cy();
+
+// implementation in inlink.cpp
+IUnknownPtr* __cdecl get_unknown_hook(IUnknownPtr* result, Ztl_variant_t& v);
+inline IUnknownPtr get_unknown(Ztl_variant_t& v) {
+    IUnknownPtr pUnk;
+    get_unknown_hook(std::addressof(pUnk), v);
+    return pUnk;
+}
