@@ -7,6 +7,7 @@ add_library(injector SHARED
     resman.cpp
     avatar.cpp
     resolution.cpp
+    mobhptag.cpp
     debug.cpp
     hook.cpp
 )

@@ -49,6 +49,7 @@ void AttachClientInlink();
 void AttachResManMod();
 void AttachAvatarDataMod();
 void AttachResolutionMod();
+void AttachMobHpTagMod();
 
 inline void AttachClientHooks() {
     AttachClientBypass();
@@ -56,6 +57,7 @@ inline void AttachClientHooks() {
     AttachResManMod();
     AttachAvatarDataMod();
     AttachResolutionMod();
+    AttachMobHpTagMod();
 }
 
 

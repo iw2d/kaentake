@@ -4,6 +4,7 @@
 #include "wvs/wvsapp.h"
 #include "wvs/iteminfo.h"
 #include "wvs/util.h"
+#include "ztl/ztl.h"
 #include <windows.h>
 
 // Change tamingMob ID from 1983XXX -> 1939XXX

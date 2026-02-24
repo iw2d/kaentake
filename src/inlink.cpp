@@ -54,8 +54,8 @@ void HandleLinkProperty(IWzCanvasPtr pCanvas) {
     }
 }
 
-static auto get_unknown_orig = reinterpret_cast<IUnknownPtr*(__cdecl*)(IUnknownPtr*, Ztl_variant_t*)>(0x00414ADA);
-IUnknownPtr* __cdecl get_unknown_hook(IUnknownPtr* result, Ztl_variant_t* v) {
+static auto get_unknown_orig = reinterpret_cast<IUnknownPtr*(__cdecl*)(IUnknownPtr*, Ztl_variant_t&)>(0x00414ADA);
+IUnknownPtr* __cdecl get_unknown_hook(IUnknownPtr* result, Ztl_variant_t& v) {
     get_unknown_orig(result, v);
     IWzCanvasPtr pCanvas;
     if (SUCCEEDED(result->QueryInterface(__uuidof(IWzCanvas), &pCanvas))) {
