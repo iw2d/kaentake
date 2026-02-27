@@ -6,8 +6,21 @@
 #include <strsafe.h>
 #include <ws2spi.h>
 #include <ws2tcpip.h>
+#include <intrin.h>
 
 #pragma comment(lib, "ws2_32.lib")
+
+
+typedef decltype(&SetUnhandledExceptionFilter) SetUnhandledExceptionFilter_t;
+static SetUnhandledExceptionFilter_t SetUnhandledExceptionFilter_orig = reinterpret_cast<SetUnhandledExceptionFilter_t>(GetAddress("KERNEL32", "SetUnhandledExceptionFilter"));
+
+LPTOP_LEVEL_EXCEPTION_FILTER WINAPI SetUnhandledExceptionFilter_hook(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter) {
+    // ZExceptionHandler::ZExceptionHandler
+    if (reinterpret_cast<uintptr_t>(_ReturnAddress()) == 0x00796FDD) {
+        AttachStringPoolMod();
+    }
+    return SetUnhandledExceptionFilter_orig(lpTopLevelExceptionFilter);
+}
 
 
 typedef decltype(&CreateMutexA) CreateMutexA_t;
@@ -142,6 +155,7 @@ int WSPAPI WSPStartup_hook(WORD wVersionRequested, LPWSPDATA lpWSPData, LPWSAPRO
 
 
 void AttachSystemHooks() {
+    ATTACH_HOOK(SetUnhandledExceptionFilter_orig, SetUnhandledExceptionFilter_hook);
     ATTACH_HOOK(CreateMutexA_orig, CreateMutexA_hook);
     ATTACH_HOOK(CreateWindowExA_orig, CreateWindowExA_hook);
     ATTACH_HOOK(RegCreateKeyExA_orig, RegCreateKeyExA_hook);

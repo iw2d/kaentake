@@ -43,6 +43,9 @@
 // called in injector.cpp -> DllMain
 void AttachSystemHooks();
 
+// called in system.cpp -> GetCommandLineA_hook
+void AttachStringPoolMod();
+
 // called in system.cpp -> CreateMutexA_hook
 void AttachClientBypass();
 void AttachClientInlink();
