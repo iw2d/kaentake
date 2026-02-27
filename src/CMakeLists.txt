@@ -8,6 +8,7 @@ add_library(injector SHARED
     avatar.cpp
     resolution.cpp
     mobhptag.cpp
+    stringpool.cpp
     debug.cpp
     hook.cpp
 )
