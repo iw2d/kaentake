@@ -13,3 +13,4 @@ PointerAlignment: Left
 AlignConsecutiveMacros: true
 AlignEscapedNewlines: DontAlign
 AlignAfterOpenBracket : DontAlign
+Cpp11BracedListStyle: false

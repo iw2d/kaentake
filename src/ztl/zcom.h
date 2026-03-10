@@ -17,9 +17,6 @@
 #include "WzLib/IWzGr2DLayer.h"
 #include "WzLib/IWzGr2D.h"
 
-#include "WzLib/IWzGr2DLayer_DX9.h"
-#include "WzLib/IWzGr2D_DX9.h"
-
 
 inline FARPROC* _g_ppfnPCOMAPIs = reinterpret_cast<FARPROC*>(0x00BF0CC0); // changed from FARPROC _g_apfnPCOMAPIs[5];
 
