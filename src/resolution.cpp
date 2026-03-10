@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "hook.h"
 #include "wvs/wnd.h"
+#include "wvs/wndman.h"
 #include "wvs/ctrlwnd.h"
 #include "wvs/stage.h"
 #include "wvs/field.h"
@@ -244,45 +245,9 @@ int CInputSystem::SetCursorPos_hook(int x, int y) {
 }
 
 
-class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
-public:
-    inline static ZList<CWnd*>& ms_lpWindow = *reinterpret_cast<ZList<CWnd*>*>(0x00BF1648);
-    inline static IWzVector2DPtr ms_pOrgWindowEx[9];
-
-    MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
-    MEMBER_HOOK(void, 0x009E2C42, Constructor, HWND hWnd)
-    MEMBER_HOOK(void, 0x009E3026, Destructor)
-    MEMBER_HOOK(IWzVector2DPtr*, 0x0048BBA5, GetOrgWindow, IWzVector2DPtr* result)
-
-    IWzVector2DPtr& GetOrgWindowEx(CWnd::UIOrigin org) {
-        return ms_pOrgWindowEx[org];
-    }
-    void ResetOrgWindow() {
-        auto pOrgWindow = CWndMan::GetInstance()->m_pOrgWindow;
-        pOrgWindow->origin = static_cast<IUnknown*>(get_gr()->center);
-        pOrgWindow->RelMove(-(get_screen_width() / 2), -(get_screen_height() / 2) - get_adjust_cy());
-        for (int i = 0; i < CWnd::UIOrigin::Origin_NUM; ++i) {
-            int nX = -(get_screen_width() / 2);
-            if (i % 3 == 1) {
-                nX += (get_screen_width() - 800) / 2;
-            } else if (i % 3 == 2) {
-                nX += (get_screen_width() - 800);
-            }
-            int nY = -(get_screen_height() / 2) - get_adjust_cy();
-            if (i / 3 == 1) {
-                nY += (get_screen_height() - 600) / 2;
-            } else if (i / 3 == 2) {
-                nY += (get_screen_height() - 600);
-            }
-            ms_pOrgWindowEx[i]->origin = static_cast<IUnknown*>(get_gr()->center);
-            ms_pOrgWindowEx[i]->RelMove(nX, nY);
-        }
-    }
-};
-
 void CWndMan::Constructor_hook(HWND hWnd) {
     CWndMan::Constructor(this, hWnd);
-    for (int i = 0; i < CWnd::UIOrigin::Origin_NUM; ++i) {
+    for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {
         PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgWindowEx[i], nullptr);
     }
     ResetOrgWindow();
@@ -290,11 +255,10 @@ void CWndMan::Constructor_hook(HWND hWnd) {
 
 void CWndMan::Destructor_hook() {
     CWndMan::Destructor(this);
-    for (int i = 0; i < CWnd::UIOrigin::Origin_NUM; ++i) {
+    for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {
         ms_pOrgWindowEx[i] = nullptr;
     }
 }
-
 
 IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());

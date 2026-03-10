@@ -43,12 +43,10 @@
 // called in injector.cpp -> DllMain
 void AttachSystemHooks();
 
-// called in system.cpp -> GetCommandLineA_hook
-void AttachStringPoolMod();
-
-// called in system.cpp -> CreateMutexA_hook
+// called in system.cpp -> SetUnhandledExceptionFilter_hook
 void AttachClientBypass();
 void AttachClientInlink();
+void AttachStringPoolMod();
 void AttachResManMod();
 void AttachAvatarDataMod();
 void AttachResolutionMod();
@@ -57,6 +55,7 @@ void AttachMobHpTagMod();
 inline void AttachClientHooks() {
     AttachClientBypass();
     AttachClientInlink();
+    AttachStringPoolMod();
     AttachResManMod();
     AttachAvatarDataMod();
     AttachResolutionMod();

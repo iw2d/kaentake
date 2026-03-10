@@ -15,9 +15,9 @@ typedef decltype(&SetUnhandledExceptionFilter) SetUnhandledExceptionFilter_t;
 static SetUnhandledExceptionFilter_t SetUnhandledExceptionFilter_orig = reinterpret_cast<SetUnhandledExceptionFilter_t>(GetAddress("KERNEL32", "SetUnhandledExceptionFilter"));
 
 LPTOP_LEVEL_EXCEPTION_FILTER WINAPI SetUnhandledExceptionFilter_hook(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter) {
-    // ZExceptionHandler::ZExceptionHandler
+    // ZExceptionHandler::ZExceptionHandler - after dynamic initializers for ZAllocEx<T>::_s_alloc
     if (reinterpret_cast<uintptr_t>(_ReturnAddress()) == 0x00796FDD) {
-        AttachStringPoolMod();
+        AttachClientHooks();
     }
     return SetUnhandledExceptionFilter_orig(lpTopLevelExceptionFilter);
 }
@@ -32,7 +32,6 @@ HANDLE WINAPI CreateMutexA_hook(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bI
         char sMutex[1024];
         sprintf_s(sMutex, 1024, "%s-%d", lpName, GetCurrentProcessId());
         lpName = sMutex;
-        AttachClientHooks();
         return CreateMutexA_orig(lpMutexAttributes, bInitialOwner, sMutex);
     }
     return CreateMutexA_orig(lpMutexAttributes, bInitialOwner, lpName);
