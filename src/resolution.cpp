@@ -201,11 +201,11 @@ void CUISysOpt::OnCreate_hook(void* pData) {
     g_cbResolution = new CCtrlComboBox();
     g_cbResolution->CreateCtrl(this, 2000, 0, 76, 338, 166, 18, &paramComboBox);
     const char* asResolution[] = {
-            "800 x 600",
-            "1024 x 768",
-            "1366 x 768",
-            "1600 x 900",
-            "1920 x 1080",
+        "800 x 600",
+        "1024 x 768",
+        "1366 x 768",
+        "1600 x 900",
+        "1920 x 1080",
     };
     unsigned int dwResolutionParam = 0;
     for (auto sResolution : asResolution) {
@@ -574,6 +574,51 @@ int __stdcall CField__ShowMobHPTag_hook1() {
 }
 
 
+class CWzGr2D : public IWzGr2D {
+public:
+    struct SCREENMODE {
+        unsigned char pad0[0x5C];
+        MEMBER_AT(int, 0x0, nWidth)
+        MEMBER_AT(int, 0x4, nHeight)
+    };
+
+    MEMBER_AT(SCREENMODE, 0x20, m_screenMode)
+    MEMBER_AT(int, 0x90, m_bInitialized)
+    MEMBER_AT(int, 0x94, m_hrErrorCode)
+    MEMBER_AT(int, 0x9C, m_nRefreshRate)
+
+    typedef int(__thiscall* FindScreenMode_t)(CWzGr2D*, SCREENMODE*, int, int, int, int);
+    inline static FindScreenMode_t FindScreenMode;
+
+    HRESULT ScreenResolution(int nWidth, int nHeight) {
+        if (!nWidth || !nHeight) {
+            return E_INVALIDARG;
+        }
+        if (m_screenMode.nWidth == nWidth && m_screenMode.nHeight == nHeight) {
+            return S_OK;
+        }
+        SCREENMODE mode;
+        if (!m_bInitialized || !FindScreenMode(this, &mode, 0, nWidth, nHeight, m_nRefreshRate)) {
+            return E_FAIL;
+        }
+        m_screenMode = mode;
+        m_hrErrorCode = 0x88760869; // D3DERR_DEVICENOTRESET
+        return S_OK;
+    }
+};
+
+static uintptr_t CWzGr2D__AdjustCenterY_jmp;
+static uintptr_t CWzGr2D__AdjustCenterY_ret;
+void __declspec(naked) CWzGr2D__AdjustCenterY_hook() {
+    __asm {
+        sub ecx, g_nAdjustCenterY           ; nCenterY -= nAdjustCenterY
+        mov [ ebp - 0x14 ], ecx
+        lea edx, [ esi + 0xC4 ]             ; overwritten instruction
+        jmp [ CWzGr2D__AdjustCenterY_ret ]
+    }
+}
+
+
 void set_screen_resolution(int nResolution, bool bSave) {
     int nScreenWidth = 800;
     int nScreenHeight = 600;
@@ -596,14 +641,13 @@ void set_screen_resolution(int nResolution, bool bSave) {
         break;
     }
     if (nScreenWidth != g_nScreenWidth || nScreenHeight != g_nScreenHeight) {
-        IWzGr2D_DX9Ptr gr = get_gr()->GetInner();
-        if (FAILED(gr->screenResolution(nScreenWidth, nScreenHeight))) {
+        auto gr = reinterpret_cast<CWzGr2D*>(get_gr().GetInterfacePtr());
+        if (FAILED(gr->ScreenResolution(nScreenWidth, nScreenHeight))) {
             return;
         }
         g_nScreenWidth = nScreenWidth;
         g_nScreenHeight = nScreenHeight;
         g_nAdjustCenterY = (g_nScreenHeight - 600) / 2;
-        gr->AdjustCenter(0, -g_nAdjustCenterY);
         if (CWndMan::IsInstantiated()) {
             CWndMan::GetInstance()->ResetOrgWindow();
             // Adjust CUtilDlgEx position
@@ -623,41 +667,6 @@ void set_screen_resolution(int nResolution, bool bSave) {
     if (bSave) {
         g_nResolution = nResolution;
     }
-}
-
-
-static auto CScreenShot__SaveFullScreenToJpg = reinterpret_cast<void(__cdecl*)(HWND hWnd, ZXString<char> sFileName)>(0x00744D77);
-void __cdecl CScreenShot__SaveFullScreenToJpg_hook(HWND hWnd, ZXString<char> sFileName) {
-    DEBUG_MESSAGE("CScreenShot::SaveFullScreenToJpg %s", sFileName);
-    IWzGr2D_DX9Ptr gr = get_gr()->GetInner();
-    gr->TakeScreenShot(static_cast<char*>(sFileName), 0x1); // SFF_JPG
-}
-
-
-class CWzGr2D_DX9 {
-public:
-    MEMBER_AT(int, 0x54, m_bWindow)
-    MEMBER_AT(int, 0x98, m_nScreenLeft)
-    MEMBER_AT(int, 0x9C, m_nScreenTop)
-    MEMBER_AT(HWND, 0xA8, m_hWnd)
-};
-
-static void* CWzGr2D_DX9__RepositionWindow;
-void __fastcall CWzGr2D_DX9__RepositionWindow_hook(CWzGr2D_DX9* pThis, void* _EDX) {
-    LONG lStyle = GetWindowLongA(pThis->m_hWnd, GWL_STYLE);
-    if ((lStyle & WS_CHILD) != 0) {
-        return;
-    }
-    UINT uFlags;
-    if (pThis->m_bWindow) {
-        lStyle = lStyle & 0x7F35FFFF | 0xCA0000;
-        uFlags = 0x29;
-    } else {
-        lStyle = 0x80080000;
-        uFlags = 0x2B;
-    }
-    SetWindowLongA(pThis->m_hWnd, GWL_STYLE, lStyle);
-    SetWindowPos(pThis->m_hWnd, pThis->m_bWindow ? HWND_NOTOPMOST : HWND_TOPMOST, pThis->m_nScreenLeft, pThis->m_nScreenTop, 0, 0, uFlags);
 }
 
 
@@ -733,10 +742,9 @@ void AttachResolutionMod() {
     // CField::ShowMobHPTag - boss hp bar position
     PatchCall(0x00533705, &CField__ShowMobHPTag_hook1, 15); // nLeft
 
-    // CScreenShot::SaveFullScreenToJpg
-    ATTACH_HOOK(CScreenShot__SaveFullScreenToJpg, CScreenShot__SaveFullScreenToJpg_hook);
-
-    // Gr2D_DX9.dll - reimplement window repositioning function as it does not account for multiple monitors
-    CWzGr2D_DX9__RepositionWindow = GetAddressByPattern("Gr2D_DX9.dll", "56 8B F1 8B 86 A8 00 00 00");
-    ATTACH_HOOK(CWzGr2D_DX9__RepositionWindow, CWzGr2D_DX9__RepositionWindow_hook);
+    // Gr2D_DX8.dll
+    CWzGr2D::FindScreenMode = reinterpret_cast<CWzGr2D::FindScreenMode_t>(GetAddressByPattern("GR2D_DX8.DLL", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 EC 68"));
+    CWzGr2D__AdjustCenterY_jmp = reinterpret_cast<uintptr_t>(GetAddressByPattern("GR2D_DX8.DLL", "8D 96 C4 00 00 00"));
+    CWzGr2D__AdjustCenterY_ret = CWzGr2D__AdjustCenterY_jmp + 6;
+    PatchJmp(CWzGr2D__AdjustCenterY_jmp, &CWzGr2D__AdjustCenterY_hook);
 }
