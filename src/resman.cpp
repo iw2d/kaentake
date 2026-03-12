@@ -105,10 +105,6 @@ void CWvsApp::InitializeResMan_hook() {
         }
     }
     std::sort(g_vecOverrides.begin(), g_vecOverrides.end()); // uses operator<
-
-    // PCOM.dll - override objects by hooking CWzProperty::raw_Serialize
-    CWzProperty::raw_Serialize_orig = static_cast<CWzProperty::raw_Serialize_t>(GetAddressByPattern("PCOM.dll", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 EC 68"));
-    ATTACH_HOOK(CWzProperty::raw_Serialize_orig, CWzProperty::raw_Serialize_hook);
 }
 
 void CWvsApp::CleanUp_hook() {
@@ -120,4 +116,8 @@ void CWvsApp::CleanUp_hook() {
 void AttachResManMod() {
     ATTACH_HOOK(CWvsApp::InitializeResMan, CWvsApp::InitializeResMan_hook);
     ATTACH_HOOK(CWvsApp::CleanUp, CWvsApp::CleanUp_hook);
+
+    // PCOM.dll - override objects by hooking CWzProperty::raw_Serialize
+    CWzProperty::raw_Serialize_orig = static_cast<CWzProperty::raw_Serialize_t>(GetAddressByPattern("PCOM.dll", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 EC 68"));
+    ATTACH_HOOK(CWzProperty::raw_Serialize_orig, CWzProperty::raw_Serialize_hook);
 }

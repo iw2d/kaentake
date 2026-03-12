@@ -580,12 +580,12 @@ public:
         unsigned char pad0[0x5C];
         MEMBER_AT(int, 0x0, nWidth)
         MEMBER_AT(int, 0x4, nHeight)
+        MEMBER_AT(int, 0x58, bFullScreen)
     };
 
     MEMBER_AT(SCREENMODE, 0x20, m_screenMode)
     MEMBER_AT(int, 0x90, m_bInitialized)
     MEMBER_AT(int, 0x94, m_hrErrorCode)
-    MEMBER_AT(int, 0x9C, m_nRefreshRate)
 
     typedef int(__thiscall* FindScreenMode_t)(CWzGr2D*, SCREENMODE*, int, int, int, int);
     inline static FindScreenMode_t FindScreenMode;
@@ -598,7 +598,7 @@ public:
             return S_OK;
         }
         SCREENMODE mode;
-        if (!m_bInitialized || !FindScreenMode(this, &mode, 0, nWidth, nHeight, m_nRefreshRate)) {
+        if (!m_bInitialized || !FindScreenMode(this, &mode, m_screenMode.bFullScreen, nWidth, nHeight, 0)) {
             return E_FAIL;
         }
         m_screenMode = mode;

@@ -38,7 +38,7 @@ void HandleLinkProperty(IWzCanvasPtr pCanvas) {
         if (V_VT(&vLink) == VT_BSTR) {
             // Get source canvas
             IWzCanvasPtr pSourceCanvas = get_rm()->GetObjectA(V_BSTR(&vLink)).GetUnknown();
-            int32_t nWidth, nHeight, nFormat, nMagLevel;
+            int nWidth, nHeight, nFormat, nMagLevel;
             pSourceCanvas->GetSnapshot(&nWidth, &nHeight, nullptr, nullptr, (CANVAS_PIXFORMAT*)&nFormat, &nMagLevel);
 
             // Create target canvas
