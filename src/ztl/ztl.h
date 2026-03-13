@@ -5,6 +5,7 @@
 #include "zcoll.h"
 #include "zstr.h"
 #include "zcom.h"
+#include <windows.h>
 #include <new>
 
 #define ZALLOC_GLOBAL \
@@ -51,3 +52,14 @@ template <typename T>
 __forceinline T* zaddressof(T& t) {
     return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(t)));
 }
+
+
+class ZException {
+public:
+    HRESULT m_hr;
+
+    ZException(HRESULT hr) {
+        m_hr = hr;
+    }
+};
+static_assert(sizeof(ZException) == 0x4);

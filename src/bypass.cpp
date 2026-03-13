@@ -3,6 +3,7 @@
 #include "wvs/wvsapp.h"
 #include "wvs/stage.h"
 #include "wvs/packet.h"
+#include "wvs/exception.h"
 #include "wvs/util.h"
 #include "ztl/ztl.h"
 
@@ -283,10 +284,14 @@ void CWvsApp::Run_hook(int* pbTerminate) {
                     HRESULT hr = m_hrZExceptionCode;
                     m_hrComErrorCode = S_OK;
                     m_hrZExceptionCode = S_OK;
-                    struct {
-                        HRESULT m_hr;
-                    } exception = {hr};
-                    throw exception;
+                    if (hr == 0x20000000) {
+                        throw CPatchException(m_nTargetVersion);
+                    } else if (hr >= 0x21000000 && hr <= 0x21000006) {
+                        throw CDisconnectException(hr);
+                    } else if (hr >= 0x22000000 && hr <= 0x2200000E) {
+                        throw CTerminateException(hr);
+                    }
+                    throw ZException(hr);
                 }
             } while (!*pbTerminate && msg.message != WM_QUIT);
         } else {
@@ -367,4 +372,5 @@ void AttachClientBypass() {
     PatchRetZero(0x009F18C9); // ShowStartUpWndModal
     PatchRetZero(0x00422C7E); // ShowAdBalloon
     PatchRetZero(0x009F191B); // SendHSLog
+    Patch1(0x00797074, 0xEB); // ZExceptionHandler::UnhandledExceptionFilter
 }
