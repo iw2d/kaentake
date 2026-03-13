@@ -9,6 +9,7 @@ add_library(injector SHARED
     itemeff.cpp
     resolution.cpp
     mobhptag.cpp
+    tooltip.cpp
     stringpool.cpp
     debug.cpp
     hook.cpp
