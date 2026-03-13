@@ -42,7 +42,7 @@ public:
     void Socket(int type, int af, int protocol) {
         _m_hSocket = socket(af, type, protocol);
         if (_m_hSocket == INVALID_SOCKET) {
-            throw WSAGetLastError();
+            throw ZException(WSAGetLastError());
         }
     }
 };
