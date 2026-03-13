@@ -52,6 +52,7 @@ void AttachAvatarDataMod();
 void AttachItemEffectMod();
 void AttachResolutionMod();
 void AttachMobHpTagMod();
+void AttachToolTipMod();
 
 inline void AttachClientHooks() {
     AttachClientBypass();
@@ -62,6 +63,7 @@ inline void AttachClientHooks() {
     AttachItemEffectMod();
     AttachResolutionMod();
     AttachMobHpTagMod();
+    AttachToolTipMod();
 }
 
 
