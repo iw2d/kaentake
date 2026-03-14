@@ -89,7 +89,7 @@ void CUser::Update_hook() {
 void CUser::SetActivePortableChair_hook(int nItemID) {
     CUser::SetActivePortableChair(this, nItemID);
     if (nItemID == 0) {
-        m_CAvatar.m_pCustomData->ptBodyRelMove = {0, 0};
+        m_CAvatar.m_pCustomData->ptBodyRelMove = { 0, 0 };
         if (m_CAvatar.m_nRidingVehicleID / 1000 == TAMINGMOB_ID_PREFIX) {
             m_CAvatar.m_pCustomData->nRidingChairID = 0;
             m_CAvatar.SetRidingVehicle_hook(0);
@@ -113,7 +113,7 @@ void CUser::SetActivePortableChair_hook(int nItemID) {
         return;
     }
     // Store to CAvatar->m_pCustomData struct
-    m_CAvatar.m_pCustomData->ptBodyRelMove = {pVector->x, pVector->y};
+    m_CAvatar.m_pCustomData->ptBodyRelMove = { pVector->x, pVector->y };
 }
 
 
@@ -127,7 +127,7 @@ void AttachAvatarDataMod() {
 
     // Implement tamingMob
     ATTACH_HOOK(CAvatar::SetRidingVehicle, CAvatar::SetRidingVehicle_hook);
-    PatchCall(0x00413A31, load_tamingmob_action_hook); // CActionMan::LoadTamingMobAction
+    PatchCall(0x00413A31, &load_tamingmob_action_hook); // CActionMan::LoadTamingMobAction
 
     // Implement bodyRelMove
     ATTACH_HOOK(CUser::Update, CUser::Update_hook);

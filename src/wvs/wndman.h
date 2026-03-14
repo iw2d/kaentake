@@ -3,6 +3,7 @@
 #include "wvs/wnd.h"
 #include "wvs/util.h"
 #include "ztl/ztl.h"
+#include <windows.h>
 
 
 class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
@@ -11,6 +12,9 @@ public:
     inline static IWzVector2DPtr ms_pOrgWindowEx[UIOrigin::Origin_NUM];
 
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
+
+    // bypass.cpp
+    MEMBER_HOOK(int, 0x009E7D77, TranslateMessage, UINT& msg, WPARAM& wParam, LPARAM& lParam, LRESULT* plResult);
 
     // resolution.cpp
     MEMBER_HOOK(void, 0x009E2C42, Constructor, HWND hWnd)

@@ -708,7 +708,7 @@ void AttachResolutionMod() {
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
 
     // CMapLoadable::TransientLayer_Weather - weather effects
-    PatchCall(0x0064106B, CMapLoadable__raw_WrapClip_hook, 6);
+    PatchCall(0x0064106B, &CMapLoadable__raw_WrapClip_hook, 6);
     Patch4(0x0064043E + 1, SCREEN_WIDTH_MAX / 2);
     Patch4(0x00640443 + 1, SCREEN_HEIGHT_MAX / 2);
     Patch4(0x00640599 + 2, SCREEN_WIDTH_MAX / 2 - 10);
