@@ -40,12 +40,27 @@ HANDLE WINAPI CreateMutexA_hook(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bI
 
 typedef decltype(&CreateWindowExA) CreateWindowExA_t;
 static CreateWindowExA_t CreateWindowExA_orig = reinterpret_cast<CreateWindowExA_t>(GetAddress("USER32", "CreateWindowExA"));
+static WNDPROC g_WndProc;
+
+LRESULT WndProc_hook(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_SETCURSOR) {
+        if (LOWORD(lParam) != HTCLIENT) {
+            while (ShowCursor(TRUE) < 0)
+                ;
+            SetCursor(LoadCursor(NULL, IDC_ARROW));
+            return 0;
+        }
+    }
+    return CallWindowProcA(g_WndProc, hWnd, msg, wParam, lParam);
+}
 
 HWND WINAPI CreateWindowExA_hook(DWORD dwExStyle, LPCSTR lpClassName, LPCSTR lpWindowName, DWORD dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam) {
     if (!lpClassName || strcmp(lpClassName, "MapleStoryClass") != 0) {
         return CreateWindowExA_orig(dwExStyle, lpClassName, lpWindowName, dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
     }
-    return CreateWindowExA_orig(dwExStyle, lpClassName, lpWindowName, dwStyle, CW_USEDEFAULT, CW_USEDEFAULT, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+    HWND hWnd = CreateWindowExA_orig(dwExStyle, lpClassName, lpWindowName, dwStyle, CW_USEDEFAULT, CW_USEDEFAULT, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+    g_WndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc_hook)));
+    return hWnd;
 }
 
 
@@ -63,9 +78,9 @@ static WSPPROC_TABLE g_ProcTable;
 static ULONG g_uNexonAddress;
 
 constexpr const char* g_asOriginalAddress[] = {
-        "63.251.217.2",
-        "63.251.217.3",
-        "63.251.217.4",
+    "63.251.217.2",
+    "63.251.217.3",
+    "63.251.217.4",
 };
 
 int WSPAPI WSPConnect_hook(SOCKET s, const struct sockaddr FAR* name, int namelen, LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS, LPINT lpErrno) {
