@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "constants.h"
 #include <windows.h>
 #include <detours.h>
 
@@ -10,12 +11,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ZeroMemory(&pi, sizeof(pi));
     si.cb = sizeof(STARTUPINFOA);
 
-    const char* sApplicationName = lpCmdLine && *lpCmdLine ? lpCmdLine : "MapleStory.exe";
-    if (!DetourCreateProcessWithDllExA(sApplicationName, lpCmdLine, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi, "kaentake.dll", NULL)) {
+    if (!DetourCreateProcessWithDllExA("MapleStory.exe", lpCmdLine, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi, "kaentake.dll", NULL)) {
         DWORD dwError = GetLastError();
         LPSTR sErrorMessage = nullptr;
         FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, dwError, 0, (LPSTR)&sErrorMessage, 0, nullptr);
-        ErrorMessage("Could not start %s [%d]\n%s", sApplicationName, dwError, sErrorMessage);
+        ErrorMessage("Could not start MapleStory.exe [%d]\n%s", dwError, sErrorMessage);
         LocalFree(sErrorMessage);
         return 1;
     }

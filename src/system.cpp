@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "hook.h"
+#include "constants.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -91,7 +92,10 @@ int WSPAPI WSPConnect_hook(SOCKET s, const struct sockaddr FAR* name, int namele
             continue;
         }
         g_uNexonAddress = ((sockaddr_in*)name)->sin_addr.S_un.S_addr;
-        InetPtonA(AF_INET, "127.0.0.1", &((sockaddr_in*)name)->sin_addr.S_un.S_addr);
+        InetPtonA(AF_INET, g_sServerHost ? g_sServerHost : CONSTANTS_DEFAULT_HOST, &((sockaddr_in*)name)->sin_addr.S_un.S_addr);
+        if (g_nServerPort) {
+            ((sockaddr_in*)name)->sin_port = htons(static_cast<u_short>(g_nServerPort));
+        }
         break;
     }
     return g_ProcTable.lpWSPConnect(s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS, lpErrno);
