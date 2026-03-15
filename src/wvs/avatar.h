@@ -3,6 +3,7 @@
 #include "ztl/ztl.h"
 #include <windows.h>
 
+
 #pragma pack(push, 1)
 struct AvatarLook : public ZRefCounted {
     unsigned char nGender;
@@ -17,12 +18,41 @@ struct AvatarLook : public ZRefCounted {
 static_assert(sizeof(AvatarLook) == 0x205);
 
 
+struct USERLAYER {
+    enum POSTYPE {
+        POS_BODY_ORIGIN = 0x0,
+        POS_FACE_ORIGIN = 0x1,
+        POS_CENTER = 0x2,
+        POS_GROUND_ORIGIN = 0x3,
+    };
+
+    int bFixed;
+    POSTYPE nPos;
+    IWzGr2DLayerPtr pLayer;
+};
+static_assert(sizeof(USERLAYER) == 0xC);
+
+struct ITEMEFFECTLAYER {
+    int nItemID;
+    int nAction;
+    int bFlip;
+    USERLAYER l;
+
+    inline void Reset() {
+        nItemID = 0;
+        nAction = 0;
+        l.pLayer = nullptr;
+    }
+};
+
+
 class CAvatar {
 public:
     struct CustomData {
         int bBlinking;
         POINT ptBodyRelMove;
         int nRidingChairID;
+        ITEMEFFECTLAYER aItemEffectLayer[60];
     };
 
     virtual ~CAvatar() = 0;
