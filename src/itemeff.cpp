@@ -7,42 +7,12 @@
 #include <map>
 
 #define AVATAR_OFFSET 0x88
-#define AL_ITEMEFFECT 2 // share with AL_ADMINEFFECT, AL_ACTIVEITEMEFFECT
-
-struct USERLAYER {
-    enum POSTYPE {
-        POS_BODY_ORIGIN = 0x0,
-        POS_FACE_ORIGIN = 0x1,
-        POS_CENTER = 0x2,
-        POS_GROUND_ORIGIN = 0x3,
-    };
-
-    int bFixed;
-    POSTYPE nPos; // USERLAYER::POSTYPE
-    IWzGr2DLayerPtr pLayer;
-};
-static_assert(sizeof(USERLAYER) == 0xC);
 
 
 class CUser {
 public:
-    struct ADDITIONALLAYER {
-        int nDataForRepeat;
-        int nType;
-        int nData;
-        USERLAYER l;
-        USERLAYER l2;
-    };
-    static_assert(sizeof(ADDITIONALLAYER) == 0x24);
-
     MEMBER_AT(CAvatar, AVATAR_OFFSET, m_CAvatar)
 
-    inline ADDITIONALLAYER* GetAdditionalLayer(int nType) {
-        return reinterpret_cast<ADDITIONALLAYER*(__thiscall*)(CUser*, int)>(0x00940BC1)(this, nType);
-    }
-    inline ADDITIONALLAYER* RemoveAdditionalLayer(int nType) {
-        return reinterpret_cast<ADDITIONALLAYER*(__thiscall*)(CUser*, int)>(0x00940CB1)(this, nType);
-    }
     inline int LoadLayer(Ztl_bstr_t bsUOL, int bLeft, USERLAYER& l, int* pnRepeatStartIndex) {
         return reinterpret_cast<int(__thiscall*)(CUser*, Ztl_bstr_t, int, USERLAYER&, int*)>(0x00941417)(this, bsUOL, bLeft, l, pnRepeatStartIndex);
     }
@@ -76,43 +46,44 @@ int __fastcall CItemInfo__IterateItemInfo_hook(CItemInfo* pThis, void* _EDX) {
 
 void UpdateItemEff(CUser* pUser) {
     CAvatar* pAvatar = &pUser->m_CAvatar;
-    bool bItemEff = false;
-    auto pAdditionalLayer = pUser->GetAdditionalLayer(AL_ITEMEFFECT);
-    for (int nItemID : pAvatar->m_avatarLook.anHairEquip) {
+    for (auto i = 0; i < 60; ++i) {
+        int nItemID = pAvatar->m_avatarLook.anHairEquip[i];
+        auto pItemEffectLayer = &pAvatar->m_pCustomData->aItemEffectLayer[i];
         if (auto search = g_mPropItemEffect.find(nItemID); search != g_mPropItemEffect.end()) {
-            bItemEff = true;
-
+            int bFlip = pAvatar->m_pLayerUnderFace->flip;
             int nAction = pAvatar->GetCurrentAction(nullptr);
+            if (pItemEffectLayer->nItemID == nItemID && pItemEffectLayer->nAction == nAction &&
+                (!pItemEffectLayer->l.bFixed && pItemEffectLayer->bFlip == bFlip)) {
+                continue;
+            }
+            pItemEffectLayer->nItemID = nItemID;
+            pItemEffectLayer->nAction = nAction;
+            pItemEffectLayer->bFlip = bFlip;
+
+            // resolve UOL
             Ztl_bstr_t sActionName;
             // get_action_name_from_code(&sActionName, nAction);
             reinterpret_cast<Ztl_bstr_t*(__cdecl*)(Ztl_bstr_t*, int)>(0x004A8CE6)(&sActionName, nAction);
-
-            // action and item id are packed into pAdditionalLayer->nData
-            if ((pAdditionalLayer->nData & 0xFFFFFF) == nItemID && ((pAdditionalLayer->nData >> 24) & 0xFF) == nAction) {
-                continue;
-            }
-            pAdditionalLayer->nData = (nAction << 24) | (nItemID & 0xFFFFFF);
-
-            // resolve UOL
             IWzPropertyPtr pEffect = search->second;
             Ztl_variant_t vAction = pEffect->item[sActionName];
             wchar_t sUOL[1024];
             swprintf(sUOL, 1024, L"Effect/ItemEff.img/%d/effect/%ls", nItemID, vAction.vt == VT_EMPTY ? L"default" : sActionName.GetBSTR());
 
             // load layer and animate
-            if (pUser->LoadLayer(sUOL, pAvatar->m_pLayerUnderFace->flip, pAdditionalLayer->l, nullptr)) {
-                pAdditionalLayer->l.pLayer->Animate(GA_REPEAT);
-            } else {
-                pUser->RemoveAdditionalLayer(AL_ITEMEFFECT);
+            if (pUser->LoadLayer(sUOL, bFlip, pItemEffectLayer->l, nullptr)) {
+                pItemEffectLayer->l.pLayer->Animate(GA_REPEAT);
             }
-            break;
+        } else {
+            pItemEffectLayer->Reset();
         }
     }
+}
 
-    // set layer visibility
-    if (pAdditionalLayer->l.pLayer) {
-        pAdditionalLayer->l.pLayer->visible = bItemEff;
-    }
+static auto CUser__UpdateAdditionalLayer = reinterpret_cast<void(__thiscall*)(CUser*)>(0x00940EB7);
+
+void __fastcall CUser__UpdateAdditionalLayer_hook(CUser* pThis, void* _EDX) {
+    CUser__UpdateAdditionalLayer(pThis);
+    UpdateItemEff(pThis);
 }
 
 static auto CUser__OnAvatarModified = reinterpret_cast<void(__thiscall*)(void*)>(0x0092E916);
@@ -132,6 +103,7 @@ void __fastcall CUser__SetMoveAction_hook(void* _ECX, void* _EDX, int nMA, int b
 
 void AttachItemEffectMod() {
     ATTACH_HOOK(CItemInfo__IterateItemInfo, CItemInfo__IterateItemInfo_hook);
+    ATTACH_HOOK(CUser__UpdateAdditionalLayer, CUser__UpdateAdditionalLayer_hook);
     ATTACH_HOOK(CUser__OnAvatarModified, CUser__OnAvatarModified_hook);
     ATTACH_HOOK(CUser__SetMoveAction, CUser__SetMoveAction_hook);
 }
