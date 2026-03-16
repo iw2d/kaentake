@@ -315,6 +315,8 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
     case 0x004EDAEB: // CDialog::CreateDlg(CDialog*, int, int, int, void*)
     case 0x004EDB9A: // CDialog::CreateDlg(CDialog*, const wchar_t*, int, void*)
     case 0x004EDAB3: // CDialog::CreateDlg(CDialog*, int, int, int, int, int, int, void*)
+    case 0x007F202C: // CUISkillEffectChange::CUISkillEffectChange
+    case 0x00897BD8: // CUIRevive::CUIRevive
         m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(CWnd::UIOrigin::Origin_CC));
         return;
     case 0x0051FA03: // CFadeWnd::CreateFadeWnd
@@ -322,17 +324,6 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
         m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(STATUS_BAR_ORIGIN));
         return;
     }
-}
-
-static auto CWnd__PreCreateWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int, int, int, int, int, void*)>(0x009DE7FB);
-void __fastcall CWnd__PreCreateWnd_hook(CWnd* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
-    auto ret = reinterpret_cast<uintptr_t>(_ReturnAddress());
-    // CEngageDlg::PreCreateWnd || CUtilDlg::PreCreateWnd
-    if (ret == 0x00515D9C || ret == 0x00991873) {
-        l = l + (get_screen_width() - 800) / 2;
-        t = t + (get_screen_height() - 600) / 2;
-    }
-    CWnd__PreCreateWnd(pThis, l, t, w, h, z, bScreenCoord, pData);
 }
 
 static auto CWnd__OnMoveWnd = reinterpret_cast<void(__thiscall*)(CWnd*, int, int)>(0x009DEB57);
@@ -689,7 +680,6 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CWndMan::Destructor, CWndMan::Destructor_hook);
     ATTACH_HOOK(CWndMan::GetOrgWindow, CWndMan::GetOrgWindow_hook);
     ATTACH_HOOK(CWnd::CreateWnd, CWnd::CreateWnd_hook);
-    ATTACH_HOOK(CWnd__PreCreateWnd, CWnd__PreCreateWnd_hook);
     ATTACH_HOOK(CWnd__OnMoveWnd, CWnd__OnMoveWnd_hook);
 
     // CUtilDlgEx::CreateUtilDlgEx - adjust for screen bounds
