@@ -62,7 +62,7 @@ public:
         ZXString<char> sValue;
         switch (nType) {
         case PT_INC:
-            if (nValue > 0) {
+            if (nValue >= 0) {
                 sValue.Format(" +%d (%s)", nValue, sDelta);
             } else {
                 sValue.Format(" -%d (%s)", nValue, sDelta);
