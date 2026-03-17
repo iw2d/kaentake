@@ -220,9 +220,6 @@ protected:
     _ZXStringData* _GetData() const {
         return reinterpret_cast<_ZXStringData*>(_m_pStr) - 1;
     }
-    _ZXStringData* _GetData() {
-        return reinterpret_cast<_ZXStringData*>(_m_pStr) - 1;
-    }
     void _FormatV(const T* sFormat, va_list argList) {
         int result = -1;
         ZXString<T> s;

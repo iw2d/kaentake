@@ -406,7 +406,7 @@ void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
 }
 
 
-class CUtilDlgEx : public CWnd {
+class CUtilDlgEx : public CWnd { // CDialog
 public:
     MEMBER_AT(int, 0x98, m_wndWidth)
     MEMBER_AT(int, 0x9C, m_wndHeight)
@@ -451,6 +451,26 @@ IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nT
         m_pLayer->RelMove(nLeft, nTop);
     }
     return result;
+}
+
+
+class CUIContextMenu : public CWnd { // CDialog
+public:
+    MEMBER_AT(int, 0xCC, m_nBtNumber)
+};
+
+void __fastcall CUIContextMenu__CreateDlg_hook(CUIContextMenu* pThis, void* _EDX, int l, int t, int w, int h, int z, int bScreenCoord, void* pData) {
+    POINT ptCursor;
+    CInputSystem::GetInstance()->GetCursorPos(&ptCursor);
+    int nWidth = 100;
+    int nHeight = 15 * (pThis->m_nBtNumber + 2);
+    if (ptCursor.x + nWidth > get_screen_width()) {
+        ptCursor.x = get_screen_width() - nWidth;
+    }
+    if (ptCursor.y + nHeight > get_screen_height()) {
+        ptCursor.y = get_screen_height() - nHeight;
+    }
+    CWnd::CreateWnd(pThis, ptCursor.x, ptCursor.y, nWidth, nHeight, 10, 1, pData, 1);
 }
 
 
@@ -687,6 +707,9 @@ void AttachResolutionMod() {
 
     // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
     ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
+
+    // CUIContextMenu::CUIContextMenu - reposition right click menu
+    PatchCall(0x009966E3, CUIContextMenu__CreateDlg_hook);
 
     // CTemporaryStatView - reposition buff display
     ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
