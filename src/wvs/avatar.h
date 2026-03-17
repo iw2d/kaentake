@@ -52,6 +52,7 @@ public:
         int bBlinking;
         POINT ptBodyRelMove;
         int nRidingChairID;
+        int nReplacedStandAction;
         ITEMEFFECTLAYER aItemEffectLayer[60];
     };
 
@@ -67,6 +68,7 @@ public:
     MEMBER_AT(CustomData*, 0x484, m_pCustomData) // Hijack m_bBlinking
     MEMBER_AT(int, 0x488, m_tNextBlink)
     MEMBER_AT(int, 0x4BC, m_nRidingVehicleID)
+    MEMBER_AT(int, 0x4EC, m_nOneTimeAction)
     MEMBER_AT(IWzVector2DPtr, 0x10B8, m_pBodyOrigin)
     MEMBER_AT(IWzGr2DLayerPtr, 0x10C8, m_pLayerUnderFace)
 
@@ -75,8 +77,12 @@ public:
     MEMBER_HOOK(void, 0x0045011C, Destructor)
     MEMBER_HOOK(void, 0x00453AA2, RegisterNextBlink)
     MEMBER_HOOK(void, 0x00456E35, SetRidingVehicle, int nVehicleID)
+    MEMBER_HOOK(int, 0x00451EC8, MoveAction2RawAction, int nMA, int* pnDir)
 
     inline int GetCurrentAction(int* pnDir) {
         return reinterpret_cast<int(__thiscall*)(CAvatar*, int*)>(0x00451E4C)(this, pnDir);
+    }
+    inline void ClearActionLayer(int nIndex) {
+        reinterpret_cast<void(__thiscall*)(CAvatar*, int)>(0x00453A29)(this, nIndex);
     }
 };

@@ -48,10 +48,19 @@ void __declspec(naked) CAvatar__Update_hook2() {
 }
 
 
+int CAvatar::MoveAction2RawAction_hook(int nMA, int* pnDir) {
+    int nAction = CAvatar::MoveAction2RawAction(this, nMA, pnDir);
+    int nReplacedStandAction = this->m_pCustomData->nReplacedStandAction;
+    if (!nReplacedStandAction || (nAction != 2 && nAction != 3)) { // stand1, stand2
+        return nAction;
+    }
+    return nReplacedStandAction + nAction - 2;
+}
+
+
 void CAvatar::SetRidingVehicle_hook(int nVehicleID) {
     if (!m_bForcingAppearance) {
-        // CAvatar::ClearActionLayer(this, 0);
-        reinterpret_cast<void(__thiscall*)(CAvatar*, int)>(0x00453A29)(this, 0);
+        ClearActionLayer(0);
         // Handle tamingMob chair
         m_nRidingVehicleID = nVehicleID;
         if (!nVehicleID && m_pCustomData->nRidingChairID) {
@@ -124,6 +133,9 @@ void AttachAvatarDataMod() {
     ATTACH_HOOK(CAvatar::RegisterNextBlink, CAvatar::RegisterNextBlink_hook);
     PatchJmp(CAvatar__Update_jmp1, CAvatar__Update_hook1);
     PatchJmp(CAvatar__Update_jmp2, CAvatar__Update_hook2);
+
+    // Implement replacedStandAction
+    ATTACH_HOOK(CAvatar::MoveAction2RawAction, CAvatar::MoveAction2RawAction_hook);
 
     // Implement tamingMob
     ATTACH_HOOK(CAvatar::SetRidingVehicle, CAvatar::SetRidingVehicle_hook);

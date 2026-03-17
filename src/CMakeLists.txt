@@ -6,6 +6,7 @@ add_library(injector SHARED
     inlink.cpp
     resman.cpp
     avatar.cpp
+    action.cpp
     itemeff.cpp
     resolution.cpp
     mobhptag.cpp

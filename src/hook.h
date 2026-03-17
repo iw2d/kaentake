@@ -49,6 +49,7 @@ void AttachClientInlink();
 void AttachStringPoolMod();
 void AttachResManMod();
 void AttachAvatarDataMod();
+void AttachCustomActionMod();
 void AttachItemEffectMod();
 void AttachResolutionMod();
 void AttachMobHpTagMod();
@@ -60,6 +61,7 @@ inline void AttachClientHooks() {
     AttachStringPoolMod();
     AttachResManMod();
     AttachAvatarDataMod();
+    AttachCustomActionMod();
     AttachItemEffectMod();
     AttachResolutionMod();
     AttachMobHpTagMod();

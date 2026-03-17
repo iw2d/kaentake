@@ -46,8 +46,14 @@ int __fastcall CItemInfo__IterateItemInfo_hook(CItemInfo* pThis, void* _EDX) {
 
 void UpdateItemEff(CUser* pUser) {
     CAvatar* pAvatar = &pUser->m_CAvatar;
+    int nReplacedStandAction = 0;
     for (auto i = 0; i < 60; ++i) {
         int nItemID = pAvatar->m_avatarLook.anHairEquip[i];
+        if (nItemID == 1002367) { // Angel Halo
+            // get_action_code_from_name
+            nReplacedStandAction = reinterpret_cast<int(__cdecl*)(Ztl_bstr_t)>(0x004A8D14)(L"stand1_floating");
+        }
+
         auto pItemEffectLayer = &pAvatar->m_pCustomData->aItemEffectLayer[i];
         if (auto search = g_mPropItemEffect.find(nItemID); search != g_mPropItemEffect.end()) {
             int bFlip = pAvatar->m_pLayerUnderFace->flip;
@@ -76,6 +82,14 @@ void UpdateItemEff(CUser* pUser) {
         } else {
             pItemEffectLayer->Reset();
         }
+    }
+
+    if (nReplacedStandAction != pAvatar->m_pCustomData->nReplacedStandAction) {
+        DEBUG_MESSAGE("nReplacedStandAction %d", nReplacedStandAction);
+        pAvatar->m_pCustomData->nReplacedStandAction = nReplacedStandAction;
+        pAvatar->m_nOneTimeAction = -1;
+        pAvatar->ClearActionLayer(1);
+        pAvatar->PrepareActionLayer(6, 100, 0);
     }
 }
 
