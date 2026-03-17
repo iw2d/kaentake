@@ -12,9 +12,26 @@
 static IWzNameSpacePtr g_pCustomNameSpace;
 static std::vector<Ztl_bstr_t> g_vecOverrides;
 
+class IWzNameSpaceImpl {
+public:
+    typedef HRESULT(__stdcall* raw__OnGetLocalObject_t)(IWzNameSpaceImpl*, int, BSTR, int*, VARIANT*);
+    inline static raw__OnGetLocalObject_t raw__OnGetLocalObject_orig;
+
+    HRESULT __stdcall raw__OnGetLocalObject_hook(int nIndex, BSTR sPath, int* pnPathUsed, VARIANT* pvRet) {
+        HRESULT hr = raw__OnGetLocalObject_orig(this, nIndex, sPath, pnPathUsed, pvRet);
+        if (SUCCEEDED(hr)) {
+            return hr;
+        }
+        if (!std::binary_search(g_vecOverrides.begin(), g_vecOverrides.end(), Ztl_bstr_t(sPath))) {
+            return hr;
+        }
+        return g_pCustomNameSpace->raw__OnGetLocalObject(nIndex, sPath, pnPathUsed, pvRet);
+    }
+};
+
 class CWzProperty : public IWzProperty {
 public:
-    typedef HRESULT(__stdcall* raw_Serialize_t)(IWzProperty*, IWzArchive*);
+    typedef HRESULT(__stdcall* raw_Serialize_t)(CWzProperty*, IWzArchive*);
     inline static raw_Serialize_t raw_Serialize_orig;
 
     HRESULT __stdcall raw_Serialize_hook(IWzArchive* pArchive) {
@@ -91,20 +108,30 @@ void CWvsApp::InitializeResMan_hook() {
             }
             Ztl_bstr_t sUOL = (sPath.length() > 0 ? sPath + L"/" : L"") + V_BSTR(&vNext);
             Ztl_variant_t vObj = get_rm()->GetObjectA(L"Custom/" + sUOL);
-            IWzNameSpacePtr pSub;
-            if (SUCCEEDED(vObj.GetUnknown()->QueryInterface(&pSub))) {
-                stack.emplace_back(sUOL, pSub->_NewEnum);
-                continue;
+            IUnknownPtr pUnk = vObj.GetUnknown();
+            if (pUnk) {
+                IWzNameSpacePtr pSub;
+                if (SUCCEEDED(pUnk->QueryInterface(&pSub))) {
+                    stack.emplace_back(sUOL, pSub->_NewEnum);
+                    continue;
+                }
+                IWzPropertyPtr pProp;
+                if (SUCCEEDED(pUnk->QueryInterface(&pProp))) {
+                    stack.emplace_back(sUOL, pProp->_NewEnum);
+                }
             }
-            IWzPropertyPtr pProp;
-            if (SUCCEEDED(vObj.GetUnknown()->QueryInterface(&pProp))) {
-                g_vecOverrides.push_back(sUOL);
-                stack.emplace_back(sUOL, pProp->_NewEnum);
-                continue;
-            }
+            g_vecOverrides.push_back(sUOL);
         }
     }
     std::sort(g_vecOverrides.begin(), g_vecOverrides.end()); // uses operator<
+
+    // NameSpace.dll - try resolving from g_pCustomNameSpace
+    IWzNameSpaceImpl::raw__OnGetLocalObject_orig = static_cast<IWzNameSpaceImpl::raw__OnGetLocalObject_t>(GetAddressByPattern("NAMESPACE.DLL", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC 80"));
+    ATTACH_HOOK(IWzNameSpaceImpl::raw__OnGetLocalObject_orig, IWzNameSpaceImpl::raw__OnGetLocalObject_hook);
+
+    // PCOM.dll - patch CWzProperty objects during serialization
+    CWzProperty::raw_Serialize_orig = static_cast<CWzProperty::raw_Serialize_t>(GetAddressByPattern("PCOM.DLL", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 EC 68"));
+    ATTACH_HOOK(CWzProperty::raw_Serialize_orig, CWzProperty::raw_Serialize_hook);
 }
 
 void CWvsApp::CleanUp_hook() {
@@ -116,8 +143,4 @@ void CWvsApp::CleanUp_hook() {
 void AttachResManMod() {
     ATTACH_HOOK(CWvsApp::InitializeResMan, CWvsApp::InitializeResMan_hook);
     ATTACH_HOOK(CWvsApp::CleanUp, CWvsApp::CleanUp_hook);
-
-    // PCOM.dll - override objects by hooking CWzProperty::raw_Serialize
-    CWzProperty::raw_Serialize_orig = static_cast<CWzProperty::raw_Serialize_t>(GetAddressByPattern("PCOM.dll", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 EC 68"));
-    ATTACH_HOOK(CWzProperty::raw_Serialize_orig, CWzProperty::raw_Serialize_hook);
 }

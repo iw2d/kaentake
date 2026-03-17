@@ -24,13 +24,13 @@ void CField::ShowMobHPTag_hook(unsigned int dwMobID, int nColor, int nBgColor, i
 
     // Draw background
     if (!g_pCanvasHpBack) {
-        g_pCanvasHpBack = get_unknown(get_rm()->GetObjectA(L"Custom/UIWindowEx.img/MobHPRatioInfo/mob/0/backgrnd"));
+        g_pCanvasHpBack = get_unknown(get_rm()->GetObjectA(L"UI/UIWindowEx.img/MobHPRatioInfo/mob/0/backgrnd"));
     }
     pCanvas->Copy(0, 37, g_pCanvasHpBack);
 
     // Draw hp percentage
     if (!g_pPropHpNum) {
-        g_pPropHpNum = get_rm()->GetObjectA(L"Custom/UIWindowEx.img/MobHPRatioInfo/num").GetUnknown();
+        g_pPropHpNum = get_rm()->GetObjectA(L"UI/UIWindowEx.img/MobHPRatioInfo/num").GetUnknown();
     }
     char sRatio[20];
     float fRatio = static_cast<float>(nHP) / static_cast<float>(nMaxHP);
