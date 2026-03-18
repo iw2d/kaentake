@@ -39,6 +39,8 @@
 
 #define TO_PVOID(VALUE) ((void*)(VALUE))
 
+inline const void* PVOID_NULLPTR = nullptr;
+
 
 // called in injector.cpp -> DllMain
 void AttachSystemHooks();

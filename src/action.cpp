@@ -65,10 +65,11 @@ public:
         MEMBER_AT(int, 0x0, nCurFrameIndex)
         MEMBER_AT(int, 0x4, tCurFrameRemain)
         MEMBER_AT(int, 0x8, tTotFrameDelay)
-        MEMBER_AT(ZArray<long>, 0xC, aFrameDelay)
+        MEMBER_AT(void*, 0xC, aFrameDelay) // ZArray<long>
         MEMBER_ARRAY_AT(void*, 0x10, aaAction, CHARACTER_ACTION_COUNT) // MAX_COUNT = (TAMINGMOB_ACTION_OFFSET - 0x10) / 4 = 323
         MEMBER_AT(void**, TAMINGMOB_ACTION_OFFSET, pTamingMobAction)   // convert to pointer
         MEMBER_ARRAY_AT(void*, 0x520, aaMorphAction, 46)
+        MEMBER_AT(void*, 0x5D8, aSPAction) // ZArray<ZList<ZRef<CActionMan::SHADOWPARTNERACTIONFRAMEENTRY>>>
 
         MEMBER_HOOK(void, 0x0044FFE2, Constructor)
         MEMBER_HOOK(void, 0x00450093, Destructor)
@@ -79,11 +80,11 @@ void CAvatar::ACTIONINFO::Constructor_hook() {
     nCurFrameIndex = -1;
     tCurFrameRemain = 0;
     tTotFrameDelay = 0;
-    construct(&aFrameDelay);
+    aFrameDelay = PVOID_NULLPTR;
     for (auto i = 0; i < CHARACTER_ACTION_COUNT; ++i) {
         aaAction[i] = nullptr;
     }
-    auto aaTamingMobAction = reinterpret_cast<void**>(ZAllocEx<ZAllocAnonSelector>::s_Alloc(sizeof(void*) * CHARACTER_ACTION_COUNT));
+    auto aaTamingMobAction = new void*[CHARACTER_ACTION_COUNT];
     for (auto i = 0; i < CHARACTER_ACTION_COUNT; ++i) {
         aaTamingMobAction[i] = nullptr;
     }
@@ -91,24 +92,27 @@ void CAvatar::ACTIONINFO::Constructor_hook() {
     for (auto i = 0; i < 46; ++i) {
         aaMorphAction[i] = nullptr;
     }
+    aSPAction = PVOID_NULLPTR;
 }
 
 void CAvatar::ACTIONINFO::Destructor_hook() {
+    // ZArray<ZList<ZRef<CActionMan::SHADOWPARTNERACTIONFRAMEENTRY>>>::RemoveAll
+    reinterpret_cast<void(__thiscall*)(void*)>(0x004573B7)(&aSPAction);
     for (auto i = 0; i < 46; ++i) {
         // ZArray<ZRef<CActionMan::MORPHACTIONFRAMEENTRY>>::~ZArray<ZRef<CActionMan::MORPHACTIONFRAMEENTRY>>
         reinterpret_cast<void(__thiscall*)(void*)>(0x0045722A)(&aaMorphAction[i]);
     }
-    auto aaTamingMobAction = reinterpret_cast<void**>(pTamingMobAction);
     for (auto i = 0; i < CHARACTER_ACTION_COUNT; ++i) {
         // ZArray<ZRef<CActionMan::TAMINGMOBACTIONFRAMEENTRY>>::~ZArray<ZRef<CActionMan::TAMINGMOBACTIONFRAMEENTRY>>
-        reinterpret_cast<void(__thiscall*)(void*)>(0x00457240)(&aaTamingMobAction[i]);
+        reinterpret_cast<void(__thiscall*)(void*)>(0x00457240)(&pTamingMobAction[i]);
     }
-    ZAllocEx<ZAllocAnonSelector>::s_Free(aaTamingMobAction);
+    delete pTamingMobAction;
     for (auto i = 0; i < CHARACTER_ACTION_COUNT; ++i) {
         // ZArray<ZRef<CActionMan::CHARACTERACTIONFRAMEENTRY>>::~ZArray<ZRef<CActionMan::CHARACTERACTIONFRAMEENTRY>>
         reinterpret_cast<void(__thiscall*)(void*)>(0x00457235)(&aaAction[i]);
     }
-    destruct(&aFrameDelay);
+    // ZArray<long>::RemoveAll
+    reinterpret_cast<void(__thiscall*)(void*)>(0x00457245)(&aFrameDelay);
 }
 
 
@@ -130,7 +134,6 @@ void __declspec(naked) CAvatar__ClearActionLayer_hook() {
         jmp     [ CAvatar__ClearActionLayer_ret ]
     }
 }
-
 
 static auto CAvatar__PrepareActionLayer_ret = 0x0045456F;
 void __declspec(naked) CAvatar__PrepareActionLayer_hook() {
