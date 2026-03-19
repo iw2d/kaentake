@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "hook.h"
+#include "constants.h"
 #include "wvs/wvsapp.h"
 #include "wvs/wndman.h"
 #include "wvs/stage.h"
@@ -14,16 +15,6 @@
 #pragma comment(lib, "winmm.lib")
 #pragma warning(disable : 4996)
 
-
-class ZInetAddr : public sockaddr_in {
-public:
-    operator const struct sockaddr *() const {
-        return (const struct sockaddr*)this;
-    }
-    operator const struct sockaddr_in *() const {
-        return (const struct sockaddr_in*)this;
-    }
-};
 
 class ZSocketBase {
 private:
@@ -47,6 +38,15 @@ public:
     }
 };
 
+class ZInetAddr : public sockaddr_in {
+public:
+    operator const struct sockaddr *() const {
+        return (const struct sockaddr*)this;
+    }
+    operator const struct sockaddr_in *() const {
+        return (const struct sockaddr_in*)this;
+    }
+};
 
 ZRECYCLABLE(ZInetAddr, 0x00BF6A18)
 
@@ -441,5 +441,5 @@ void AttachClientBypass() {
     PatchRetZero(0x009F18C9); // ShowStartUpWndModal
     PatchRetZero(0x00422C7E); // ShowAdBalloon
     PatchRetZero(0x009F191B); // SendHSLog
-    Patch1(0x00797074, 0xEB); // ZExceptionHandler::UnhandledExceptionFilter
+    Patch1(0x00797074, 0xEB); // ZExceptionHandler::UnhandledExceptionFilter - fix process hang
 }

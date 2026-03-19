@@ -15,7 +15,7 @@ char* g_sServerHost = nullptr;
 long g_nServerPort = 0;
 
 void ProcessCommandLine() {
-    if (!CONSTANTS_CMD_HOST) {
+    if (!CONSTANTS_USE_COMMAND_LINE) {
         return;
     }
     char sBuffer[1024];
@@ -27,15 +27,15 @@ void ProcessCommandLine() {
 }
 
 void ProcessConfigFile() {
-    if (!CONSTANTS_INI_HOST || g_sServerHost) {
+    if (!CONSTANTS_USE_CONFIG_FILE || g_sServerHost) {
         return;
     }
     char sBuffer[1024];
-    if (GetPrivateProfileStringA("config", "host", "", sBuffer, sizeof(sBuffer), ".\\" CONSTANTS_INI_NAME) == 0) {
+    if (GetPrivateProfileStringA("config", "host", "", sBuffer, sizeof(sBuffer), ".\\" CONSTANTS_CONFIG_NAME) == 0) {
         return;
     }
     g_sServerHost = _strdup(sBuffer);
-    if (GetPrivateProfileStringA("config", "port", "", sBuffer, sizeof(sBuffer), ".\\" CONSTANTS_INI_NAME) == 0) {
+    if (GetPrivateProfileStringA("config", "port", "", sBuffer, sizeof(sBuffer), ".\\" CONSTANTS_CONFIG_NAME) == 0) {
         return;
     }
     g_nServerPort = atoi(sBuffer);
