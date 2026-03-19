@@ -28,29 +28,36 @@ public:
 void HandleLinkProperty(IWzCanvasPtr pCanvas) {
     // Check for link property
     const wchar_t* asLinkProperty[] = {
-            L"_inlink",
-            L"_outlink",
-            L"source",
+        L"_inlink",
+        L"_outlink",
+        L"source",
     };
     size_t nLinkProperty = sizeof(asLinkProperty) / sizeof(asLinkProperty[0]);
     for (size_t i = 0; i < nLinkProperty; ++i) {
         Ztl_variant_t vLink = pCanvas->property->item[asLinkProperty[i]];
-        if (V_VT(&vLink) == VT_BSTR) {
-            // Get source canvas
-            IWzCanvasPtr pSourceCanvas = get_rm()->GetObjectA(V_BSTR(&vLink)).GetUnknown();
-            int nWidth, nHeight, nFormat, nMagLevel;
-            pSourceCanvas->GetSnapshot(&nWidth, &nHeight, nullptr, nullptr, (CANVAS_PIXFORMAT*)&nFormat, &nMagLevel);
-
-            // Create target canvas
-            pCanvas->Create(nWidth, nHeight, nMagLevel, nFormat);
-            pCanvas->AddRawCanvas(0, 0, pSourceCanvas->rawCanvas[0][0]);
-
-            // Set target origin
-            IWzVector2DPtr pOrigin = pCanvas->property->item[L"origin"].GetUnknown();
-            pCanvas->cx = pOrigin->x;
-            pCanvas->cy = pOrigin->y;
-            break;
+        if (V_VT(&vLink) != VT_BSTR) {
+            continue;
         }
+
+        // Try resolving source canvas
+        IWzCanvasPtr pSource;
+        IUnknownPtr pUnknown = get_rm()->GetObjectA(V_BSTR(&vLink)).GetUnknown();
+        if (!pUnknown || FAILED(pUnknown->QueryInterface(&pSource))) {
+            DEBUG_MESSAGE("Could not resolve linked canvas %ls=\"%ls\"", asLinkProperty[i], V_BSTR(&vLink));
+            continue;
+        }
+
+        // Create target canvas
+        int nWidth, nHeight, nFormat, nMagLevel;
+        pSource->GetSnapshot(&nWidth, &nHeight, nullptr, nullptr, (CANVAS_PIXFORMAT*)&nFormat, &nMagLevel);
+        pCanvas->Create(nWidth, nHeight, nMagLevel, nFormat);
+        pCanvas->AddRawCanvas(0, 0, pSource->rawCanvas[0][0]);
+
+        // Set target origin
+        IWzVector2DPtr pOrigin = pCanvas->property->item[L"origin"].GetUnknown();
+        pCanvas->cx = pOrigin->x;
+        pCanvas->cy = pOrigin->y;
+        break;
     }
 }
 
