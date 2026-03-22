@@ -3,6 +3,8 @@
 #include "constants.h"
 #include "wvs/wnd.h"
 #include "wvs/wndman.h"
+#include "wvs/tooltip.h"
+#include "wvs/tempstat.h"
 #include "wvs/statusbar.h"
 #include "wvs/ctrlwnd.h"
 #include "wvs/stage.h"
@@ -436,14 +438,6 @@ void CUtilDlgEx::CreateUtilDlgEx_hook() {
 }
 
 
-class CUIToolTip {
-public:
-    MEMBER_AT(int, 0x8, m_nHeight)
-    MEMBER_AT(int, 0xC, m_nWidth)
-    MEMBER_AT(IWzGr2DLayerPtr, 0x10, m_pLayer)
-    MEMBER_HOOK(IWzCanvasPtr*, 0x008F3141, MakeLayer, IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor)
-};
-
 IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor) {
     CUIToolTip::MakeLayer(this, result, nLeft, nTop, bDoubleOutline, bLogin, bCharToolTip, uColor);
     if (!bCharToolTip) {
@@ -486,19 +480,6 @@ void __fastcall CUIContextMenu__CreateDlg_hook(CUIContextMenu* pThis, void* _EDX
     CWnd::CreateWnd(pThis, ptCursor.x, ptCursor.y, nWidth, nHeight, 10, 1, pData, 1);
 }
 
-class CTemporaryStatView {
-public:
-    struct TEMPORARY_STAT : public ZRefCounted {
-        unsigned char pad0[0x40 - sizeof(ZRefCounted)];
-        MEMBER_AT(int, 0x1C, nType)
-        MEMBER_AT(IWzGr2DLayerPtr, 0x28, pLayer)
-        MEMBER_AT(IWzGr2DLayerPtr, 0x2C, pLayerShadow)
-    };
-    MEMBER_AT(ZList<ZRef<TEMPORARY_STAT>>, 0x4, m_lTemporaryStat)
-    MEMBER_HOOK(void, 0x007B2BB0, AdjustPosition)
-    MEMBER_HOOK(int, 0x007B2E58, ShowToolTip, CUIToolTip& uiToolTip, const POINT& ptCursor, int rx, int ry)
-    MEMBER_HOOK(int, 0x007B3055, FindIcon, const POINT& ptCursor, int& nType, int& nID)
-};
 
 void CTemporaryStatView::AdjustPosition_hook() {
     int nOffsetX = (get_screen_width() / 2) - 3 + (-32 * m_lTemporaryStat.GetCount());

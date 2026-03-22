@@ -27,13 +27,13 @@ public:
         MEMBER_AT(ZtlSecure<int>, 0x134, nKnockback)
     };
 
-    inline IWzPropertyPtr GetItemInfo(int nItemID) {
+    IWzPropertyPtr GetItemInfo(int nItemID) {
         IWzPropertyPtr result;
         reinterpret_cast<IWzPropertyPtr*(__thiscall*)(CItemInfo*, IWzPropertyPtr*, int)>(0x005DA83C)(this, std::addressof(result), nItemID);
         return result;
     }
 
-    inline EQUIPITEM* GetEquipItem(int nItemID) {
+    EQUIPITEM* GetEquipItem(int nItemID) {
         return reinterpret_cast<EQUIPITEM*(__thiscall*)(CItemInfo*, int)>(0x005CA785)(this, nItemID);
     }
 };

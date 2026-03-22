@@ -10,6 +10,7 @@ add_library(injector SHARED
     resolution.cpp
     mobhptag.cpp
     tooltip.cpp
+    tempstat.cpp
     stringpool.cpp
     debug.cpp
     hook.cpp

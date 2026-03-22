@@ -24,10 +24,10 @@ public:
     MEMBER_HOOK(void, 0x009E3026, Destructor)
     MEMBER_HOOK(IWzVector2DPtr*, 0x0048BBA5, GetOrgWindow, IWzVector2DPtr* result)
 
-    inline IWzVector2DPtr& GetOrgWindowEx(CWnd::UIOrigin org) {
+    IWzVector2DPtr& GetOrgWindowEx(CWnd::UIOrigin org) {
         return ms_pOrgWindowEx[org];
     }
-    inline void ResetOrgWindow() {
+    void ResetOrgWindow() {
         m_pOrgWindow->origin = static_cast<IUnknown*>(get_gr()->center);
         m_pOrgWindow->RelMove(-(get_screen_width() / 2), -(get_screen_height() / 2) - get_adjust_cy());
         for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {

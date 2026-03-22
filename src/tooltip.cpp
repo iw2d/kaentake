@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "hook.h"
-#include "constants.h"
 #include "wvs/secure.h"
+#include "wvs/tooltip.h"
 #include "wvs/iteminfo.h"
 #include "ztl/ztl.h"
 
@@ -28,56 +28,6 @@ public:
     MEMBER_AT(ZtlSecure<short>, 0xAC, nAttribute)
 };
 
-class CUIToolTip {
-public:
-    enum { // PrintValue Type
-        PT_INC = 0x0,
-        PT_VALUE = 0x1,
-        PT_PERCENT = 0x2,
-    };
-
-    MEMBER_HOOK(void, 0x008ECA0C, SetToolTip_Equip_Basic, GW_ItemSlotEquip* pe)
-
-    void AddInfoEx(int nType, int nSubType, ZXString<char> sContext, ZXString<char> sSubContext, int bUseDot, int nAlign) {
-        reinterpret_cast<void(__thiscall*)(CUIToolTip*, int, int, ZXString<char>, ZXString<char>, int, int)>(0x008F39E1)(this, nType, nSubType, sContext, sSubContext, bUseDot, nAlign);
-    }
-    void PrintValue(int nType, int nValue, ZXString<char> sProperty, int bShowAlways) {
-        reinterpret_cast<void(__thiscall*)(CUIToolTip*, int, int, ZXString<char>, int)>(0x008E7836)(this, nType, nValue, sProperty, bShowAlways);
-    }
-    void PrintValueEx(int nType, int nValue, int nBase, ZXString<char> sProperty, int bShowAlways) {
-        if (!bShowAlways && nValue <= 0 && nBase <= 0) {
-            return;
-        }
-        if (nValue == nBase || nType == PT_PERCENT) {
-            PrintValue(nType, nValue, sProperty, bShowAlways);
-            return;
-        }
-
-        ZXString<char> sDelta;
-        if (nValue > nBase) {
-            sDelta.Format("%d + %d", nBase, nValue - nBase);
-        } else {
-            sDelta.Format("%d - %d", nBase, nBase - nValue);
-        }
-
-        ZXString<char> sValue;
-        switch (nType) {
-        case PT_INC:
-            if (nValue >= 0) {
-                sValue.Format(" +%d (%s)", nValue, sDelta);
-            } else {
-                sValue.Format(" -%d (%s)", nValue, sDelta);
-            }
-            break;
-        case PT_VALUE:
-            sValue.Format(" %d (%s)", nValue, sDelta);
-            break;
-        }
-        if (!sValue.IsEmpty()) {
-            AddInfoEx(14, 16, sProperty, sValue, 1, 1001);
-        }
-    }
-};
 
 void CUIToolTip::SetToolTip_Equip_Basic_hook(GW_ItemSlotEquip* pe) {
     int nItemID = pe->nItemID;
@@ -136,9 +86,5 @@ void CUIToolTip::SetToolTip_Equip_Basic_hook(GW_ItemSlotEquip* pe) {
 
 
 void AttachToolTipMod() {
-    if (!CONSTANTS_TOOLTIP_DELTA) {
-        return;
-    }
-
     ATTACH_HOOK(CUIToolTip::SetToolTip_Equip_Basic, CUIToolTip::SetToolTip_Equip_Basic_hook);
 }

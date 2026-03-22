@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "hook.h"
-#include "constants.h"
 #include "wvs/util.h"
 #include "ztl/ztl.h"
 
@@ -50,10 +49,6 @@ unsigned int __fastcall CField__ShowMobHPTag__GetHeight_hook(IWzCanvas* pThis, v
 
 
 void AttachMobHpTagMod() {
-    if (!CONSTANTS_MOB_HP_TAG) {
-        return;
-    }
-
     ATTACH_HOOK(CField::ShowMobHPTag, CField::ShowMobHPTag_hook);
     PatchCall(0x00533AFD, &CField__ShowMobHPTag__GetHeight_hook); // patch m_pLayerHPTag height in CField::ShowMobHPTag
 }
