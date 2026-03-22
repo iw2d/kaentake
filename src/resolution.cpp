@@ -523,6 +523,13 @@ int CTemporaryStatView::FindIcon_hook(const POINT& ptCursor, int& nType, int& nI
 }
 
 
+int CUIStatusBar::GetShortCutIndexByPos_hook(int x, int y) {
+    x = x + CWndMan::ms_pOrgStatusBar->x - CWndMan::ms_pOrgQuickSlot->x;
+    y = y + CWndMan::ms_pOrgStatusBar->y - CWndMan::ms_pOrgQuickSlot->y;
+    return CUIStatusBar::GetShortCutIndexByPos(this, x, y);
+}
+
+
 class CWvsContext : public TSingleton<CWvsContext, 0x00BE7918> {
 public:
     MEMBER_AT(CTemporaryStatView, 0x2EA8, m_temporaryStatView)
@@ -744,6 +751,10 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
     ATTACH_HOOK(CTemporaryStatView::ShowToolTip, CTemporaryStatView::ShowToolTip_hook);
     ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
+
+    // CUIStatusBar - handle quickslot position
+    Patch4(0x008CFD50 + 1, SCREEN_WIDTH_MAX); // CUIStatusBar::CUIStatusBar
+    ATTACH_HOOK(CUIStatusBar::GetShortCutIndexByPos, CUIStatusBar::GetShortCutIndexByPos_hook);
 
     // CMapLoadable - handle view range
     ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
