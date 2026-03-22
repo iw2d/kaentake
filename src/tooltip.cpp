@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "hook.h"
+#include "constants.h"
 #include "wvs/secure.h"
 #include "wvs/iteminfo.h"
 #include "ztl/ztl.h"
@@ -135,5 +136,9 @@ void CUIToolTip::SetToolTip_Equip_Basic_hook(GW_ItemSlotEquip* pe) {
 
 
 void AttachToolTipMod() {
+    if (!CONSTANTS_TOOLTIP_DELTA) {
+        return;
+    }
+
     ATTACH_HOOK(CUIToolTip::SetToolTip_Equip_Basic, CUIToolTip::SetToolTip_Equip_Basic_hook);
 }

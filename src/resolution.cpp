@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "hook.h"
+#include "constants.h"
 #include "wvs/wnd.h"
 #include "wvs/wndman.h"
 #include "wvs/ctrlwnd.h"
@@ -13,9 +14,9 @@
 #include <strsafe.h>
 #include <intrin.h>
 
-#define STATUS_BAR_ORIGIN CWnd::UIOrigin::Origin_CB
-#define SCREEN_WIDTH_MAX  1920
-#define SCREEN_HEIGHT_MAX 1080
+#define SCREEN_WIDTH_MAX     1920
+#define SCREEN_HEIGHT_MAX    1080
+#define SCREEN_MESSAGE_WIDTH 400
 
 
 static ZRef<CCtrlComboBox> g_cbResolution;
@@ -250,6 +251,9 @@ void CWndMan::Constructor_hook(HWND hWnd) {
     for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {
         PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgWindowEx[i], nullptr);
     }
+    PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgStatusBar, nullptr);
+    PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgScreenMsg, nullptr);
+    PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgQuickSlot, nullptr);
     ResetOrgWindow();
 }
 
@@ -258,6 +262,9 @@ void CWndMan::Destructor_hook() {
     for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {
         ms_pOrgWindowEx[i] = nullptr;
     }
+    ms_pOrgStatusBar = nullptr;
+    ms_pOrgScreenMsg = nullptr;
+    ms_pOrgQuickSlot = nullptr;
 }
 
 IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
@@ -275,16 +282,21 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     case 0x0053502B: // CField::ShowScreenEffect
         result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CC);
         break;
-    case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
     case 0x008DEB75: // CUIStatusBar::FlashHPBar
     case 0x008DEE11: // CUIStatusBar::FlashMPBar
-        result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
+        result->GetInterfacePtr() = ms_pOrgStatusBar;
+        break;
+    case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
+        result->GetInterfacePtr() = ms_pOrgScreenMsg;
+        break;
+    case 0x008D15EE: // CUIStatusBar::OnCreate - CQuickSlot
+        result->GetInterfacePtr() = ms_pOrgQuickSlot;
         break;
     default:
-        if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
-            result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
-        } else if (ret >= 0x00554005 && ret <= 0x0055478F) { // CField_Dojang::Init
+        if (ret >= 0x00554005 && ret <= 0x0055478F) { // CField_Dojang::Init
             result->GetInterfacePtr() = GetOrgWindowEx(Origin_CT);
+        } else if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
+            result->GetInterfacePtr() = ms_pOrgStatusBar;
         } else {
             result->GetInterfacePtr() = m_pOrgWindow;
         }
@@ -321,7 +333,7 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
         return;
     case 0x0051FA03: // CFadeWnd::CreateFadeWnd
     case 0x008CFD65: // CUIStatusBar::CUIStatusBar
-        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(STATUS_BAR_ORIGIN));
+        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::ms_pOrgStatusBar);
         return;
     }
 }
@@ -473,7 +485,6 @@ void __fastcall CUIContextMenu__CreateDlg_hook(CUIContextMenu* pThis, void* _EDX
     CWnd::CreateWnd(pThis, ptCursor.x, ptCursor.y, nWidth, nHeight, 10, 1, pData, 1);
 }
 
-
 class CTemporaryStatView {
 public:
     struct TEMPORARY_STAT : public ZRefCounted {
@@ -571,6 +582,17 @@ HRESULT __fastcall CField_LimitedView__CopyEx_hook(IWzCanvas* pThis, void* _EDX,
     nDstLeft = nDstLeft + (SCREEN_WIDTH_MAX / 2) - 400;
     nDstTop = nDstTop + (SCREEN_HEIGHT_MAX / 2) - 300 + ((SCREEN_HEIGHT_MAX - 600) / 2);
     return pThis->CopyEx(nDstLeft, nDstTop, pSource, nAlpha, nWidth, nHeight, nSrcLeft, nSrcTop, nSrcWidth, nSrcHeight, pAdjust);
+}
+
+
+HRESULT __stdcall CUIScreenMsg__raw_RelMove_hook(IWzVector2D* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
+    nX = nX + 290 - SCREEN_MESSAGE_WIDTH;
+    return pThis->raw_RelMove(nX, nY, nTime, nType);
+}
+
+HRESULT __fastcall CUIScreenMsg__RelMove_hook(IWzVector2D* pThis, void* _EDX, int nX, int nY, const Ztl_variant_t& nTime, const Ztl_variant_t& nType) {
+    nX = nX + 290 - SCREEN_MESSAGE_WIDTH;
+    return pThis->RelMove(nX, nY, nTime, nType);
 }
 
 
@@ -746,6 +768,12 @@ void AttachResolutionMod() {
     PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
     PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);
     PatchCall(0x0055C1DD, &CField_LimitedView__CopyEx_hook);
+
+    // CUIScreenMsg - screen message width
+    Patch4(0x0089AF33 + 1, SCREEN_MESSAGE_WIDTH);              // CUIScreenMsg::CUIScreenMsg
+    Patch4(0x0089B2C6 + 1, SCREEN_MESSAGE_WIDTH);              // CUIScreenMsg::ScrMsg_Add
+    PatchCall(0x0089B6FE, &CUIScreenMsg__raw_RelMove_hook, 6); // CUIScreenMsg::LayoutScrMsg
+    PatchCall(0x0089BA13, &CUIScreenMsg__RelMove_hook);        // CUIScreenMsg::MoveScrMsg
 
     // CSlideNotice - sliding notice width
     Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice

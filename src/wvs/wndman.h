@@ -10,6 +10,9 @@ class CWndMan : public CWnd, public TSingleton<CWndMan, 0x00BEC20C> {
 public:
     inline static ZList<CWnd*>& ms_lpWindow = *reinterpret_cast<ZList<CWnd*>*>(0x00BF1648);
     inline static IWzVector2DPtr ms_pOrgWindowEx[UIOrigin::Origin_NUM];
+    inline static IWzVector2DPtr ms_pOrgStatusBar;
+    inline static IWzVector2DPtr ms_pOrgScreenMsg;
+    inline static IWzVector2DPtr ms_pOrgQuickSlot;
 
     MEMBER_AT(IWzVector2DPtr, 0xDC, m_pOrgWindow)
 
@@ -42,6 +45,22 @@ public:
             }
             ms_pOrgWindowEx[i]->origin = static_cast<IUnknown*>(get_gr()->center);
             ms_pOrgWindowEx[i]->RelMove(nX, nY);
+        }
+        if (CONSTANTS_CENTER_STATUSBAR) {
+            ms_pOrgStatusBar->origin = static_cast<IUnknown*>(ms_pOrgWindowEx[Origin_CB]);
+            ms_pOrgScreenMsg->origin = static_cast<IUnknown*>(ms_pOrgWindowEx[Origin_CB]);
+            ms_pOrgQuickSlot->origin = static_cast<IUnknown*>(ms_pOrgWindowEx[Origin_CB]);
+        } else {
+            ms_pOrgStatusBar->origin = static_cast<IUnknown*>(ms_pOrgWindowEx[Origin_LB]);
+            ms_pOrgScreenMsg->origin = static_cast<IUnknown*>(ms_pOrgWindowEx[Origin_RB]);
+            ms_pOrgQuickSlot->origin = static_cast<IUnknown*>(ms_pOrgWindowEx[Origin_LB]);
+            if (get_screen_width() > 800) {
+                ms_pOrgScreenMsg->RelMove(0, 68);
+                ms_pOrgQuickSlot->RelMove(152, 68);
+            } else {
+                ms_pOrgQuickSlot->RelMove(0, 0);
+                ms_pOrgQuickSlot->RelMove(0, 0);
+            }
         }
     }
 };
