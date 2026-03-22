@@ -38,7 +38,7 @@ struct ITEMEFFECTLAYER {
     int bFlip;
     USERLAYER l;
 
-    inline void Reset() {
+    void Reset() {
         nItemID = 0;
         nAction = 0;
         l.pLayer = nullptr;
@@ -76,7 +76,7 @@ public:
     MEMBER_HOOK(void, 0x00453AA2, RegisterNextBlink)
     MEMBER_HOOK(void, 0x00456E35, SetRidingVehicle, int nVehicleID)
 
-    inline int GetCurrentAction(int* pnDir) {
+    int GetCurrentAction(int* pnDir) {
         return reinterpret_cast<int(__thiscall*)(CAvatar*, int*)>(0x00451E4C)(this, pnDir);
     }
 };

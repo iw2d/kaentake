@@ -1,7 +1,11 @@
 #include "pch.h"
 #include "hook.h"
+#include "constants.h"
 #include "wvs/wnd.h"
 #include "wvs/wndman.h"
+#include "wvs/tooltip.h"
+#include "wvs/tempstat.h"
+#include "wvs/statusbar.h"
 #include "wvs/ctrlwnd.h"
 #include "wvs/stage.h"
 #include "wvs/field.h"
@@ -13,9 +17,9 @@
 #include <strsafe.h>
 #include <intrin.h>
 
-#define STATUS_BAR_ORIGIN CWnd::UIOrigin::Origin_CB
-#define SCREEN_WIDTH_MAX  1920
-#define SCREEN_HEIGHT_MAX 1080
+#define SCREEN_WIDTH_MAX     1920
+#define SCREEN_HEIGHT_MAX    1080
+#define SCREEN_MESSAGE_WIDTH 400
 
 
 static ZRef<CCtrlComboBox> g_cbResolution;
@@ -250,6 +254,9 @@ void CWndMan::Constructor_hook(HWND hWnd) {
     for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {
         PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgWindowEx[i], nullptr);
     }
+    PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgStatusBar, nullptr);
+    PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgScreenMsg, nullptr);
+    PcCreateObject<IWzVector2DPtr>(L"Shape2D#Vector2D", ms_pOrgQuickSlot, nullptr);
     ResetOrgWindow();
 }
 
@@ -258,6 +265,9 @@ void CWndMan::Destructor_hook() {
     for (int i = 0; i < UIOrigin::Origin_NUM; ++i) {
         ms_pOrgWindowEx[i] = nullptr;
     }
+    ms_pOrgStatusBar = nullptr;
+    ms_pOrgScreenMsg = nullptr;
+    ms_pOrgQuickSlot = nullptr;
 }
 
 IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
@@ -275,16 +285,21 @@ IWzVector2DPtr* CWndMan::GetOrgWindow_hook(IWzVector2DPtr* result) {
     case 0x0053502B: // CField::ShowScreenEffect
         result->GetInterfacePtr() = GetOrgWindowEx(CWnd::UIOrigin::Origin_CC);
         break;
-    case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
     case 0x008DEB75: // CUIStatusBar::FlashHPBar
     case 0x008DEE11: // CUIStatusBar::FlashMPBar
-        result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
+        result->GetInterfacePtr() = ms_pOrgStatusBar;
+        break;
+    case 0x0089AF82: // CUIScreenMsg::CUIScreenMsg
+        result->GetInterfacePtr() = ms_pOrgScreenMsg;
+        break;
+    case 0x008D15EE: // CUIStatusBar::OnCreate - CQuickSlot
+        result->GetInterfacePtr() = ms_pOrgQuickSlot;
         break;
     default:
-        if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
-            result->GetInterfacePtr() = GetOrgWindowEx(STATUS_BAR_ORIGIN);
-        } else if (ret >= 0x00554005 && ret <= 0x0055478F) { // CField_Dojang::Init
+        if (ret >= 0x00554005 && ret <= 0x0055478F) { // CField_Dojang::Init
             result->GetInterfacePtr() = GetOrgWindowEx(Origin_CT);
+        } else if (ret >= 0x008D01B2 && ret <= 0x008D3ADF) { // CUIStatusBar::OnCreate
+            result->GetInterfacePtr() = ms_pOrgStatusBar;
         } else {
             result->GetInterfacePtr() = m_pOrgWindow;
         }
@@ -321,7 +336,7 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
         return;
     case 0x0051FA03: // CFadeWnd::CreateFadeWnd
     case 0x008CFD65: // CUIStatusBar::CUIStatusBar
-        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(STATUS_BAR_ORIGIN));
+        m_pLayer->origin = static_cast<IUnknown*>(CWndMan::ms_pOrgStatusBar);
         return;
     }
 }
@@ -358,7 +373,7 @@ void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
     while (pos) {
         auto pNext = CWndMan::ms_lpWindow.GetNext(pos);
         if (pNext == pThis || pThis->IsMyAddOn(pNext) ||
-                pNext == reinterpret_cast<CWnd*>(0x00BEC208)) { // TSingleton<CUIStatusBar>::ms_pInstance
+                pNext == CUIStatusBar::GetInstance()) {
             continue;
         }
         int nNextLeft = pNext->GetAbsLeft();
@@ -423,14 +438,6 @@ void CUtilDlgEx::CreateUtilDlgEx_hook() {
 }
 
 
-class CUIToolTip {
-public:
-    MEMBER_AT(int, 0x8, m_nHeight)
-    MEMBER_AT(int, 0xC, m_nWidth)
-    MEMBER_AT(IWzGr2DLayerPtr, 0x10, m_pLayer)
-    MEMBER_HOOK(IWzCanvasPtr*, 0x008F3141, MakeLayer, IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor)
-};
-
 IWzCanvasPtr* CUIToolTip::MakeLayer_hook(IWzCanvasPtr* result, int nLeft, int nTop, int bDoubleOutline, int bLogin, int bCharToolTip, unsigned int uColor) {
     CUIToolTip::MakeLayer(this, result, nLeft, nTop, bDoubleOutline, bLogin, bCharToolTip, uColor);
     if (!bCharToolTip) {
@@ -474,20 +481,6 @@ void __fastcall CUIContextMenu__CreateDlg_hook(CUIContextMenu* pThis, void* _EDX
 }
 
 
-class CTemporaryStatView {
-public:
-    struct TEMPORARY_STAT : public ZRefCounted {
-        unsigned char pad0[0x40 - sizeof(ZRefCounted)];
-        MEMBER_AT(int, 0x1C, nType)
-        MEMBER_AT(IWzGr2DLayerPtr, 0x28, pLayer)
-        MEMBER_AT(IWzGr2DLayerPtr, 0x2C, pLayerShadow)
-    };
-    MEMBER_AT(ZList<ZRef<TEMPORARY_STAT>>, 0x4, m_lTemporaryStat)
-    MEMBER_HOOK(void, 0x007B2BB0, AdjustPosition)
-    MEMBER_HOOK(int, 0x007B2E58, ShowToolTip, CUIToolTip& uiToolTip, const POINT& ptCursor, int rx, int ry)
-    MEMBER_HOOK(int, 0x007B3055, FindIcon, const POINT& ptCursor, int& nType, int& nID)
-};
-
 void CTemporaryStatView::AdjustPosition_hook() {
     int nOffsetX = (get_screen_width() / 2) - 3 + (-32 * m_lTemporaryStat.GetCount());
     int nOffsetY = (get_screen_height() / 2) + get_adjust_cy() - 23;
@@ -508,6 +501,13 @@ int CTemporaryStatView::ShowToolTip_hook(CUIToolTip& uiToolTip, const POINT& ptC
 int CTemporaryStatView::FindIcon_hook(const POINT& ptCursor, int& nType, int& nID) {
     POINT ptAdjust = { ptCursor.x + 800 - get_screen_width(), ptCursor.y };
     return CTemporaryStatView::FindIcon(this, ptAdjust, nType, nID);
+}
+
+
+int CUIStatusBar::GetShortCutIndexByPos_hook(int x, int y) {
+    x = x + CWndMan::ms_pOrgStatusBar->x - CWndMan::ms_pOrgQuickSlot->x;
+    y = y + CWndMan::ms_pOrgStatusBar->y - CWndMan::ms_pOrgQuickSlot->y;
+    return CUIStatusBar::GetShortCutIndexByPos(this, x, y);
 }
 
 
@@ -571,6 +571,23 @@ HRESULT __fastcall CField_LimitedView__CopyEx_hook(IWzCanvas* pThis, void* _EDX,
     nDstLeft = nDstLeft + (SCREEN_WIDTH_MAX / 2) - 400;
     nDstTop = nDstTop + (SCREEN_HEIGHT_MAX / 2) - 300 + ((SCREEN_HEIGHT_MAX - 600) / 2);
     return pThis->CopyEx(nDstLeft, nDstTop, pSource, nAlpha, nWidth, nHeight, nSrcLeft, nSrcTop, nSrcWidth, nSrcHeight, pAdjust);
+}
+
+
+HRESULT __stdcall CUIScreenMsg__raw_RelMove_hook(IWzVector2D* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
+    nX = nX + 290 - SCREEN_MESSAGE_WIDTH;
+    if (!CONSTANTS_CENTER_STATUSBAR && get_screen_width() > 800 && CUIStatusBar::GetInstance()->m_bQuickSlotUp) {
+        nY = nY + 443 - 365;
+    }
+    return pThis->raw_RelMove(nX, nY, nTime, nType);
+}
+
+HRESULT __fastcall CUIScreenMsg__RelMove_hook(IWzVector2D* pThis, void* _EDX, int nX, int nY, const Ztl_variant_t& nTime, const Ztl_variant_t& nType) {
+    nX = nX + 290 - SCREEN_MESSAGE_WIDTH;
+    if (!CONSTANTS_CENTER_STATUSBAR && get_screen_width() > 800 && CUIStatusBar::GetInstance()->m_bQuickSlotUp) {
+        nY = nY + 443 - 365;
+    }
+    return pThis->RelMove(nX, nY, nTime, nType);
 }
 
 
@@ -716,6 +733,10 @@ void AttachResolutionMod() {
     ATTACH_HOOK(CTemporaryStatView::ShowToolTip, CTemporaryStatView::ShowToolTip_hook);
     ATTACH_HOOK(CTemporaryStatView::FindIcon, CTemporaryStatView::FindIcon_hook);
 
+    // CUIStatusBar - handle quickslot position
+    Patch4(0x008CFD50 + 1, SCREEN_WIDTH_MAX); // CUIStatusBar::CUIStatusBar
+    ATTACH_HOOK(CUIStatusBar::GetShortCutIndexByPos, CUIStatusBar::GetShortCutIndexByPos_hook);
+
     // CMapLoadable - handle view range
     ATTACH_HOOK(CMapLoadable::RestoreViewRange, CMapLoadable::RestoreViewRange_hook);
     PatchJmp(CMapLoadable__MakeGrid_jmp, &CMapLoadable__MakeGrid_hook);
@@ -746,6 +767,12 @@ void AttachResolutionMod() {
     PatchCall(0x0055BEFE, &CField_LimitedView__raw_Copy_hook, 6);
     PatchCall(0x0055C08E, &CField_LimitedView__CopyEx_hook);
     PatchCall(0x0055C1DD, &CField_LimitedView__CopyEx_hook);
+
+    // CUIScreenMsg - screen message width
+    Patch4(0x0089AF33 + 1, SCREEN_MESSAGE_WIDTH);              // CUIScreenMsg::CUIScreenMsg
+    Patch4(0x0089B2C6 + 1, SCREEN_MESSAGE_WIDTH);              // CUIScreenMsg::ScrMsg_Add
+    PatchCall(0x0089B6FE, &CUIScreenMsg__raw_RelMove_hook, 6); // CUIScreenMsg::LayoutScrMsg
+    PatchCall(0x0089BA13, &CUIScreenMsg__RelMove_hook);        // CUIScreenMsg::MoveScrMsg
 
     // CSlideNotice - sliding notice width
     Patch4(0x007E15BE + 1, SCREEN_WIDTH_MAX); // CSlideNotice::CSlideNotice
