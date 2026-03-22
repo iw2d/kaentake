@@ -3,6 +3,7 @@
 #include "constants.h"
 #include "wvs/wnd.h"
 #include "wvs/wndman.h"
+#include "wvs/statusbar.h"
 #include "wvs/ctrlwnd.h"
 #include "wvs/stage.h"
 #include "wvs/field.h"
@@ -370,7 +371,7 @@ void __fastcall CWnd__OnMoveWnd_hook(CWnd* pThis, void* _EDX, int l, int t) {
     while (pos) {
         auto pNext = CWndMan::ms_lpWindow.GetNext(pos);
         if (pNext == pThis || pThis->IsMyAddOn(pNext) ||
-                pNext == reinterpret_cast<CWnd*>(0x00BEC208)) { // TSingleton<CUIStatusBar>::ms_pInstance
+                pNext == CUIStatusBar::GetInstance()) {
             continue;
         }
         int nNextLeft = pNext->GetAbsLeft();
@@ -587,11 +588,17 @@ HRESULT __fastcall CField_LimitedView__CopyEx_hook(IWzCanvas* pThis, void* _EDX,
 
 HRESULT __stdcall CUIScreenMsg__raw_RelMove_hook(IWzVector2D* pThis, int nX, int nY, VARIANT nTime, VARIANT nType) {
     nX = nX + 290 - SCREEN_MESSAGE_WIDTH;
+    if (!CONSTANTS_CENTER_STATUSBAR && get_screen_width() > 800 && CUIStatusBar::GetInstance()->m_bQuickSlotUp) {
+        nY = nY + 443 - 365;
+    }
     return pThis->raw_RelMove(nX, nY, nTime, nType);
 }
 
 HRESULT __fastcall CUIScreenMsg__RelMove_hook(IWzVector2D* pThis, void* _EDX, int nX, int nY, const Ztl_variant_t& nTime, const Ztl_variant_t& nType) {
     nX = nX + 290 - SCREEN_MESSAGE_WIDTH;
+    if (!CONSTANTS_CENTER_STATUSBAR && get_screen_width() > 800 && CUIStatusBar::GetInstance()->m_bQuickSlotUp) {
+        nY = nY + 443 - 365;
+    }
     return pThis->RelMove(nX, nY, nTime, nType);
 }
 
