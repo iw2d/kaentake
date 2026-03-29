@@ -639,10 +639,12 @@ static uintptr_t CWzGr2D__AdjustCenterY_jmp;
 static uintptr_t CWzGr2D__AdjustCenterY_ret;
 void __declspec(naked) CWzGr2D__AdjustCenterY_hook() {
     __asm {
-        sub ecx, g_nAdjustCenterY           ; nCenterY -= nAdjustCenterY
-        mov [ ebp - 0x14 ], ecx
-        lea edx, [ esi + 0xC4 ]             ; overwritten instruction
-        jmp [ CWzGr2D__AdjustCenterY_ret ]
+        pushfd                                  ; push flags onto stack
+        sub     ecx, g_nAdjustCenterY           ; nCenterY -= nAdjustCenterY
+        mov     [ ebp - 0x14 ], ecx
+        lea     edx, [ esi + 0xC4 ]             ; overwritten instruction
+        popfd                                   ; pop flags from stack
+        jmp     [ CWzGr2D__AdjustCenterY_ret ]
     }
 }
 
