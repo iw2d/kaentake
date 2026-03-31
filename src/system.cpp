@@ -44,13 +44,63 @@ static CreateWindowExA_t CreateWindowExA_orig = reinterpret_cast<CreateWindowExA
 static WNDPROC g_WndProc;
 
 LRESULT WndProc_hook(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (msg == WM_SETCURSOR) {
+    static POINT ptOffset;
+    static bool bMoving;
+    switch (msg) {
+    case WM_SETCURSOR: {
         if (LOWORD(lParam) != HTCLIENT) {
             while (ShowCursor(TRUE) < 0)
                 ;
             SetCursor(LoadCursor(NULL, IDC_ARROW));
             return 0;
         }
+        break;
+    }
+    case WM_NCMOUSEMOVE:
+    case WM_MOUSEMOVE:
+        if (bMoving) {
+            if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
+                POINT ptCursor;
+                GetCursorPos(&ptCursor);
+                SetWindowPos(hWnd, NULL, ptCursor.x - ptOffset.x, ptCursor.y - ptOffset.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            } else {
+                bMoving = false;
+                ReleaseCapture();
+            }
+        }
+        break;
+    case WM_NCLBUTTONDOWN:
+        if (wParam == HTMENU || wParam == HTLEFT) {
+            break;
+        } else if (wParam == HTCAPTION) {
+            RECT rcWnd;
+            POINT ptCursor;
+            GetWindowRect(hWnd, &rcWnd);
+            GetCursorPos(&ptCursor);
+            ptOffset.x = ptCursor.x - rcWnd.left;
+            ptOffset.y = ptCursor.y - rcWnd.top;
+            SetCapture(hWnd);
+            bMoving = true;
+        }
+        return 0;
+    case WM_NCLBUTTONUP:
+    case WM_LBUTTONUP:
+        if (wParam == HTCLOSE) {
+            PostQuitMessage(0);
+        } else if (wParam == HTMINBUTTON && !(GetAsyncKeyState(VK_CONTROL) & 0x8000)) {
+            ShowWindow(hWnd, SW_MINIMIZE);
+        }
+        bMoving = false;
+        ReleaseCapture();
+        break;
+    case WM_NCRBUTTONDOWN:
+    case WM_NCRBUTTONUP:
+        return 0;
+    case WM_RBUTTONUP:
+        if (!bMoving) {
+            break;
+        }
+        return 0;
     }
     return CallWindowProcA(g_WndProc, hWnd, msg, wParam, lParam);
 }
@@ -59,7 +109,7 @@ HWND WINAPI CreateWindowExA_hook(DWORD dwExStyle, LPCSTR lpClassName, LPCSTR lpW
     if (!lpClassName || strcmp(lpClassName, "MapleStoryClass") != 0) {
         return CreateWindowExA_orig(dwExStyle, lpClassName, lpWindowName, dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
     }
-    HWND hWnd = CreateWindowExA_orig(dwExStyle, lpClassName, lpWindowName, dwStyle, CW_USEDEFAULT, CW_USEDEFAULT, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+    HWND hWnd = CreateWindowExA_orig(dwExStyle, lpClassName, lpWindowName, 0xCA0000, CW_USEDEFAULT, CW_USEDEFAULT, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
     g_WndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc_hook)));
     return hWnd;
 }
