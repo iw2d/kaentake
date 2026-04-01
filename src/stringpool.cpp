@@ -38,7 +38,7 @@ void EncodeString(int nIdx, const char* sSource, char* sDestination) {
     for (size_t i = 0; i < n; ++i) {
         unsigned char key = keygen.m_aKey[i % 0x10];
         sDestination[i + 1] = sSource[i] ^ key;
-        if (sSource[i] == key) {
+        if (static_cast<uint8_t>(sSource[i]) == static_cast<uint8_t>(key)) {
             sDestination[i + 1] = key;
         }
     }
