@@ -32,8 +32,10 @@ public:
         reinterpret_cast<IWzPropertyPtr*(__thiscall*)(CItemInfo*, IWzPropertyPtr*, int)>(0x005DA83C)(this, std::addressof(result), nItemID);
         return result;
     }
-
     EQUIPITEM* GetEquipItem(int nItemID) {
         return reinterpret_cast<EQUIPITEM*(__thiscall*)(CItemInfo*, int)>(0x005CA785)(this, nItemID);
+    }
+    void DrawItemIconForSlot(IWzCanvasPtr pCanvas, int nItemID, int x, int y, int bProtectedItem, int bMag2, int bPetDead, int bHideCashIcon, int nEquipItemQuality, int bHideQualityIcon) {
+        reinterpret_cast<void(__thiscall*)(CItemInfo*, IWzCanvasPtr, int, int, int, int, int, int, int, int, int)>(0x005D6458)(this, pCanvas, nItemID, x, y, bProtectedItem, bMag2, bPetDead, bHideCashIcon, nEquipItemQuality, bHideQualityIcon);
     }
 };
