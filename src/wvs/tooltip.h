@@ -23,6 +23,15 @@ public:
     // tooltip.cpp
     MEMBER_HOOK(void, 0x008ECA0C, SetToolTip_Equip_Basic, GW_ItemSlotEquip* pe)
 
+    virtual ~CUIToolTip() {
+        reinterpret_cast<void(__thiscall*)(CUIToolTip*)>(0x008E6BA3)(this);
+    }
+    CUIToolTip() {
+        reinterpret_cast<void(__thiscall*)(CUIToolTip*)>(0x008E49B5)(this);
+    }
+    void ClearToolTip() {
+        reinterpret_cast<void(__thiscall*)(CUIToolTip*)>(0x008E6E23)(this);
+    }
     void AddInfoEx(int nType, int nSubType, ZXString<char> sContext, ZXString<char> sSubContext, int bUseDot, int nAlign) {
         reinterpret_cast<void(__thiscall*)(CUIToolTip*, int, int, ZXString<char>, ZXString<char>, int, int)>(0x008F39E1)(this, nType, nSubType, sContext, sSubContext, bUseDot, nAlign);
     }
