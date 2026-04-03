@@ -58,7 +58,7 @@ public:
                 ms_pOrgScreenMsg->RelMove(0, -10);
                 ms_pOrgQuickSlot->RelMove(152, 68);
             } else {
-                ms_pOrgQuickSlot->RelMove(0, 0);
+                ms_pOrgScreenMsg->RelMove(0, 0);
                 ms_pOrgQuickSlot->RelMove(0, 0);
             }
         }
