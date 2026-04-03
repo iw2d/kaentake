@@ -12,7 +12,7 @@ add_library(injector SHARED
     tooltip.cpp
     itemicon.cpp
     tempstat.cpp
-    battlship.cpp
+    battleship.cpp
     stringpool.cpp
     debug.cpp
     hook.cpp
