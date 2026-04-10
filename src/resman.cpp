@@ -125,6 +125,19 @@ void CWvsApp::InitializeResMan_hook() {
     }
     std::sort(g_vecOverrides.begin(), g_vecOverrides.end()); // uses operator<
 
+    // load Map2.wz
+    IWzPackagePtr pPackage2;
+    PcCreateObject<IWzPackagePtr>(L"NameSpace#Package", pPackage2, nullptr);
+    IWzSeekableArchivePtr pArchive2 = fs->item[L"Map2.wz"].GetUnknown();
+    pPackage2->Init(L"83", L"Map", pArchive2);
+
+    IWzNameSpacePtr pNameSpace2;
+    PcCreateObject<IWzNameSpacePtr>(L"NameSpace", pNameSpace2, nullptr);
+    pNameSpace2->Mount(L"/", pPackage2, 0);
+
+    IWzNameSpacePtr pSubMap = get_root()->item[L"Map"].GetUnknown();
+    DEBUG_MESSAGE("Mount %d", pSubMap->raw_Mount(L"/", pNameSpace2, 1));
+
     // NameSpace.dll - try resolving from g_pCustomNameSpace
     IWzNameSpaceImpl::raw__OnGetLocalObject_orig = static_cast<IWzNameSpaceImpl::raw__OnGetLocalObject_t>(GetAddressByPattern("NAMESPACE.DLL", "B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC 80"));
     ATTACH_HOOK(IWzNameSpaceImpl::raw__OnGetLocalObject_orig, IWzNameSpaceImpl::raw__OnGetLocalObject_hook);
