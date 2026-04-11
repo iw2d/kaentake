@@ -704,8 +704,14 @@ void AttachResolutionMod() {
     // CUIToolTip::MakeLayer - handle maximum bounds for CUIToolTip
     ATTACH_HOOK(CUIToolTip::MakeLayer, CUIToolTip::MakeLayer_hook);
 
+    // CUIToolTip::SetToolTip_Equip2 - another bounds check
+    Patch1(0x008EBC3C, 0xA1); // mov eax, [ g_nScreenWidth ]
+    Patch4(0x008EBC3C + 1, reinterpret_cast<uintptr_t>(&g_nScreenWidth));
+    Patch1(0x008EBC58, 0xA1); // mov eax, [ g_nScreenHeight ]
+    Patch4(0x008EBC58 + 1, reinterpret_cast<uintptr_t>(&g_nScreenHeight));
+
     // CUIContextMenu::CUIContextMenu - reposition right click menu
-    PatchCall(0x009966E3, CUIContextMenu__CreateDlg_hook);
+    PatchCall(0x009966E3, &CUIContextMenu__CreateDlg_hook);
 
     // CTemporaryStatView - reposition buff display
     ATTACH_HOOK(CTemporaryStatView::AdjustPosition, CTemporaryStatView::AdjustPosition_hook);
