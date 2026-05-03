@@ -309,6 +309,7 @@ void CWnd::CreateWnd_hook(int l, int t, int w, int h, int z, int bScreenCoord, v
     case 0x004EDAB3: // CDialog::CreateDlg(CDialog*, int, int, int, int, int, int, void*)
     case 0x007F202C: // CUISkillEffectChange::CUISkillEffectChange
     case 0x00897BD8: // CUIRevive::CUIRevive
+    case 0x00994CB8: // CUIChannelShift::CUIChannelShift
         m_pLayer->origin = static_cast<IUnknown*>(CWndMan::GetInstance()->GetOrgWindowEx(CWnd::UIOrigin::Origin_CC));
         return;
     case 0x0051FA03: // CFadeWnd::CreateFadeWnd
