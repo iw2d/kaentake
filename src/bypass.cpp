@@ -62,7 +62,7 @@ public:
     MEMBER_AT(HWND, 0x4, m_hWnd)
     MEMBER_AT(ZSocketBase, 0x8, m_sock)
     MEMBER_AT(CONNECTCONTEXT, 0xC, m_ctxConnect)
-    MEMBER_AT(int, 0x48, m_tTimeout)
+    MEMBER_AT(int, 0x38, m_tTimeout)
     MEMBER_HOOK(void, 0x00494CA3, Connect, const CONNECTCONTEXT& ctx)
 };
 
